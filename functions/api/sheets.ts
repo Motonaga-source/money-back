@@ -47,41 +47,77 @@ async function createJWT(
 
     const unsignedToken = `${encodedHeader}.${encodedPayload}`;
 
-    // Import the private key
-    const pemHeader = '-----BEGIN PRIVATE KEY-----';
-    const pemFooter = '-----END PRIVATE KEY-----';
-    const pemContents = privateKey
-        .replace(pemHeader, '')
-        .replace(pemFooter, '')
-        .replace(/\\n/g, '')
-        .replace(/\s/g, '');
+    // Import the private key with improved error handling
+    try {
+        const pemHeader = '-----BEGIN PRIVATE KEY-----';
+        const pemFooter = '-----END PRIVATE KEY-----';
 
-    const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
+        // Debug: Log the first 100 characters of the private key
+        console.log('🔑 Private key (first 100 chars):', privateKey.substring(0, 100));
 
-    const cryptoKey = await crypto.subtle.importKey(
-        'pkcs8',
-        binaryDer,
-        {
-            name: 'RSASSA-PKCS1-v1_5',
-            hash: 'SHA-256',
-        },
-        false,
-        ['sign']
-    );
+        // Handle both literal newlines and escaped newlines (\n)
+        let cleanedKey = privateKey;
 
-    // Sign the token
-    const signature = await crypto.subtle.sign(
-        'RSASSA-PKCS1-v1_5',
-        cryptoKey,
-        new TextEncoder().encode(unsignedToken)
-    );
+        // Remove quotes if present
+        if (cleanedKey.startsWith('"') && cleanedKey.endsWith('"')) {
+            cleanedKey = cleanedKey.slice(1, -1);
+        }
+        if (cleanedKey.startsWith("'") && cleanedKey.endsWith("'")) {
+            cleanedKey = cleanedKey.slice(1, -1);
+        }
 
-    const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_')
-        .replace(/=/g, '');
+        // Replace escaped newlines with actual newlines
+        cleanedKey = cleanedKey.replace(/\\n/g, '\n');
 
-    return `${unsignedToken}.${encodedSignature}`;
+        // Extract the PEM contents (between header and footer)
+        const pemContents = cleanedKey
+            .replace(pemHeader, '')
+            .replace(pemFooter, '')
+            .replace(/\n/g, '')  // Remove actual newlines
+            .replace(/\r/g, '')  // Remove carriage returns
+            .replace(/\s/g, ''); // Remove all whitespace
+
+        console.log('🔑 PEM contents length:', pemContents.length);
+        console.log('🔑 PEM contents (first 50 chars):', pemContents.substring(0, 50));
+
+        // Validate base64 content
+        if (!/^[A-Za-z0-9+/=]+$/.test(pemContents)) {
+            throw new Error('Invalid base64 characters in private key');
+        }
+
+        const binaryDer = Uint8Array.from(atob(pemContents), (c) => c.charCodeAt(0));
+
+        console.log('🔑 Binary DER length:', binaryDer.length);
+
+        const cryptoKey = await crypto.subtle.importKey(
+            'pkcs8',
+            binaryDer,
+            {
+                name: 'RSASSA-PKCS1-v1_5',
+                hash: 'SHA-256',
+            },
+            false,
+            ['sign']
+        );
+
+        // Sign the token
+        const signature = await crypto.subtle.sign(
+            'RSASSA-PKCS1-v1_5',
+            cryptoKey,
+            new TextEncoder().encode(unsignedToken)
+        );
+
+        const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=/g, '');
+
+        return `${unsignedToken}.${encodedSignature}`;
+    } catch (error) {
+        console.error('❌ Failed to process private key:', error);
+        console.error('Private key format issue. Make sure the key includes BEGIN/END markers and uses \\n for newlines.');
+        throw new Error(`Private key processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 }
 
 // Get access token from Google
