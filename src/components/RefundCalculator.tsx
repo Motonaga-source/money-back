@@ -606,8 +606,6 @@ export default function RefundCalculator() {
                         <tbody className="divide-y divide-gray-200">
                           {summary.月別データ.map((month, idx) => {
                             const その他 = month.日用品 + month.修繕積立 + month.金銭管理費 + month.火災保険;
-                            const unitData = unitMaster.find(u => u.ユニット名 === month.所属ユニット);
-                            const 実際の家賃 = unitData?.家賃 || 0;
                             return (
                               <tr key={idx} className="hover:bg-gray-50">
                                 <td className="px-4 py-2 text-gray-900">{month.年月}</td>
@@ -616,7 +614,7 @@ export default function RefundCalculator() {
                                   {month.月額預り金.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {実際の家賃.toLocaleString()}
+                                  {month.家賃.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
                                   {month.光熱費.toLocaleString()}
@@ -939,8 +937,8 @@ export default function RefundCalculator() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   {tab.label}
