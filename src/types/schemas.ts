@@ -1,6 +1,8 @@
-export interface UserMaster {
+export interface UnitManagement {
+  年月: string;
   利用者ID: string;
   氏名: string;
+  所属ユニット: string;
   月額預り金: number;
   家賃補助: number;
   日用品費: number;
@@ -12,14 +14,6 @@ export interface UserMaster {
   金銭管理費: number;
   火災保険: number;
   備考: string;
-}
-
-export interface UnitManagement {
-  年月: string;
-  利用者ID: string;
-  氏名: string;
-  所属ユニット: string;
-  ステータス: string;
 }
 
 export interface UnitMaster {
@@ -73,8 +67,7 @@ export interface SheetConfig {
 }
 
 export const SHEET_CONFIGS: Record<string, SheetConfig> = {
-  userMaster: { name: '利用者マスタ', range: 'A:M' },
-  unitManagement: { name: 'ユニット管理', range: 'A:E' },
+  unitManagement: { name: 'ユニット管理', range: 'A:O' },
   unitMaster: { name: 'ユニットマスタ', range: 'A:C' },
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },

@@ -82,46 +82,6 @@ export async function fetchSheetData(
   }
 }
 
-export async function fetchUserMaster(spreadsheetId: string): Promise<UserMaster[]> {
-  const config = SHEET_CONFIGS.userMaster;
-  const rows = await fetchSheetData(spreadsheetId, config.name, config.range);
-
-  if (rows.length <= 1) {
-    console.log('No data in UserMaster sheet');
-    return [];
-  }
-
-  console.log('Raw UserMaster rows (first 2):', rows.slice(0, 2));
-
-  const data = rows.slice(1).map((row, index) => {
-    const parsed = {
-      利用者ID: parseString(row[0]),
-      氏名: parseString(row[1]),
-      月額預り金: parseNumber(row[2], '月額預り金'),
-      家賃補助: parseNumber(row[3], '家賃補助'),
-      日用品費: parseNumber(row[4], '日用品費'),
-      修繕積立金: parseNumber(row[5], '修繕積立金'),
-      朝食費: parseNumber(row[6], '朝食費'),
-      昼食費: parseNumber(row[7], '昼食費'),
-      夕食費: parseNumber(row[8], '夕食費'),
-      行事食: parseNumber(row[9], '行事食'),
-      金銭管理費: parseNumber(row[10], '金銭管理費'),
-      火災保険: parseNumber(row[11], '火災保険'),
-      備考: parseString(row[12]),
-    };
-
-    if (index === 0) {
-      console.log('First user parsed:', parsed);
-      console.log('Raw row data:', row);
-    }
-
-    return parsed;
-  });
-
-  console.log('Parsed UserMaster data:', data.length, 'users');
-  return data;
-}
-
 export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitManagement[]> {
   const config = SHEET_CONFIGS.unitManagement;
   const rows = await fetchSheetData(spreadsheetId, config.name, config.range);
@@ -130,13 +90,31 @@ export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitMa
 
   console.log('Raw UnitManagement rows (first 2):', rows.slice(0, 2));
 
-  const data = rows.slice(1).map((row) => ({
-    年月: parseString(row[0]),
-    利用者ID: parseString(row[1]),
-    氏名: parseString(row[2]),
-    所属ユニット: parseString(row[3]),
-    ステータス: parseString(row[4]),
-  }));
+  const data = rows.slice(1).map((row, index) => {
+    const parsed = {
+      年月: parseString(row[0]),
+      利用者ID: parseString(row[1]),
+      氏名: parseString(row[2]),
+      所属ユニット: parseString(row[3]),
+      月額預り金: parseNumber(row[4], '月額預り金'),
+      家賃補助: parseNumber(row[5], '家賃補助'),
+      日用品費: parseNumber(row[6], '日用品費'),
+      修繕積立金: parseNumber(row[7], '修繕積立金'),
+      朝食費: parseNumber(row[8], '朝食費'),
+      昼食費: parseNumber(row[9], '昼食費'),
+      夕食費: parseNumber(row[10], '夕食費'),
+      行事食: parseNumber(row[11], '行事食'),
+      金銭管理費: parseNumber(row[12], '金銭管理費'),
+      火災保険: parseNumber(row[13], '火災保険'),
+      備考: parseString(row[14]),
+    };
+
+    if (index === 0) {
+      console.log('First UnitManagement parsed:', parsed);
+    }
+
+    return parsed;
+  });
 
   console.log('Parsed UnitManagement data:', data.length, 'records');
   return data;

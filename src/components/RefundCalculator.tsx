@@ -9,7 +9,6 @@ import {
   RefundDetail,
 } from '../types/schemas';
 import {
-  fetchUserMaster,
   fetchUnitManagement,
   fetchUnitMaster,
   fetchUnitUtilityCost,
@@ -58,7 +57,6 @@ export default function RefundCalculator() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('userMaster');
 
-  const [userMaster, setUserMaster] = useState<UserMaster[]>([]);
   const [unitManagement, setUnitManagement] = useState<UnitManagement[]>([]);
   const [unitMaster, setUnitMaster] = useState<UnitMaster[]>([]);
   const [unitUtilityCost, setUnitUtilityCost] = useState<UnitUtilityCost[]>([]);
@@ -242,14 +240,12 @@ export default function RefundCalculator() {
       console.log('Loading data from spreadsheet:', spreadsheetId);
 
       const [
-        userMasterData,
         unitManagementData,
         unitMasterData,
         unitUtilityCostData,
         mealCountData,
         refundDetailData,
       ] = await Promise.all([
-        fetchUserMaster(spreadsheetId),
         fetchUnitManagement(spreadsheetId),
         fetchUnitMaster(spreadsheetId),
         fetchUnitUtilityCost(spreadsheetId),
@@ -258,7 +254,6 @@ export default function RefundCalculator() {
       ]);
 
       console.log('Data loaded successfully:', {
-        userMaster: userMasterData.length,
         unitManagement: unitManagementData.length,
         unitMaster: unitMasterData.length,
         unitUtilityCost: unitUtilityCostData.length,
@@ -266,7 +261,6 @@ export default function RefundCalculator() {
         refundDetail: refundDetailData.length,
       });
 
-      setUserMaster(userMasterData);
       setUnitManagement(unitManagementData);
       setUnitMaster(unitMasterData);
       setUnitUtilityCost(unitUtilityCostData);
@@ -302,33 +296,7 @@ export default function RefundCalculator() {
   };
 
   const calculateRefunds = () => {
-    if (!unitManagement.length || !userMaster.length) {
-      setError('データを先に読み込んでください');
-      return;
-    }
-
-    console.log('🔄 還元金計算を開始...');
-    console.log('利用可能なデータ:', {
-      unitManagement: unitManagement.length,
-      userMaster: userMaster.length,
-      unitMaster: unitMaster.length,
-      unitUtilityCost: unitUtilityCost.length,
-      mealCount: mealCount.length,
-    });
-
-    const unitMemberCount: Record<string, number> = {};
-    unitManagement.forEach((um) => {
-      const key = `${um.年月}_${um.所属ユニット}`;
-      unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
-    });
-
-    console.log('📋 ユニット別人数:', unitMemberCount);
-
-    let successCount = 0;
-    let warningCount = 0;
-
     const calculated: CalculatedRefund[] = unitManagement.map((um, index) => {
-      const user = userMaster.find((u) => u.利用者ID === um.利用者ID);
       const unit = unitMaster.find((u) => u.ユニット名 === um.所属ユニット);
       const utility = unitUtilityCost.find(
         (u) => u.ユニット名 === um.所属ユニット && u.年月 === um.年月
@@ -340,7 +308,7 @@ export default function RefundCalculator() {
       const unitKey = `${um.年月}_${um.所属ユニット}`;
       const ユニット人数 = unitMemberCount[unitKey] || 1;
 
-      const hasAllData = user && unit && utility && meal;
+      const hasAllData = unit && utility && meal;
       if (hasAllData) {
         successCount++;
       } else {
@@ -362,32 +330,31 @@ export default function RefundCalculator() {
       }
 
       console.log(`[${index + 1}/${unitManagement.length}] ${um.氏名} (${um.利用者ID})`, {
-        利用者マスタ: user ? '✓' : '✗',
         ユニットマスタ: unit ? '✓' : '✗',
         光熱費データ: utility ? '✓' : '✗',
         食数データ: meal ? '✓' : '✗',
         ユニット人数: `${ユニット人数}人`,
       });
 
-      const 月額預り金 = user?.月額預り金 || 0;
-      const 家賃補助 = user?.家賃補助 || 0;
+      const 月額預り金 = um.月額預り金 || 0;
+      const 家賃補助 = um.家賃補助 || 0;
       const ユニット家賃 = unit?.家賃 || 0;
 
       // 実質負担する家賃 = ユニット本来の家賃 + 家賃補助 (家賃補助がマイナス値のため足し算)
       const 実質家賃 = Math.max(0, ユニット家賃 + 家賃補助);
 
-      const 日用品 = user?.日用品費 || 0;
-      const 修繕積立 = user?.修繕積立金 || 0;
+      const 日用品 = um.日用品費 || 0;
+      const 修繕積立 = um.修繕積立金 || 0;
 
       const 朝食回数 = meal?.朝食 || 0;
       const 昼食回数 = meal?.昼食 || 0;
       const 夕食回数 = meal?.夕食 || 0;
       const 行事食回数 = meal?.行事食 || 0;
 
-      const 朝食単価 = user?.朝食費 || 0;
-      const 昼食単価 = user?.昼食費 || 0;
-      const 夕食単価 = user?.夕食費 || 0;
-      const 行事食単価 = user?.行事食 || 0;
+      const 朝食単価 = um.朝食費 || 0;
+      const 昼食単価 = um.昼食費 || 0;
+      const 夕食単価 = um.夕食費 || 0;
+      const 行事食単価 = um.行事食 || 0;
 
       const 朝食費 = 朝食回数 * 朝食単価;
       const 昼食費 = 昼食回数 * 昼食単価;
@@ -412,8 +379,8 @@ export default function RefundCalculator() {
         });
       }
 
-      const 金銭管理費 = user?.金銭管理費 || 0;
-      const 火災保険 = user?.火災保険 || 0;
+      const 金銭管理費 = um.金銭管理費 || 0;
+      const 火災保険 = um.火災保険 || 0;
 
       const 当月還元金合計 = 月額預り金 - 実質家賃 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険;
 
@@ -535,7 +502,6 @@ export default function RefundCalculator() {
   };
 
   const tabs = [
-    { id: 'userMaster', label: '利用者マスタ', data: userMaster },
     { id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
     { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
     { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
@@ -919,7 +885,7 @@ export default function RefundCalculator() {
           </div>
         )}
 
-        {activeTab !== 'userMaster' && (
+        {unitManagement.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
             <div className="border-b border-gray-200">
               <nav className="-mb-px flex overflow-x-auto">
