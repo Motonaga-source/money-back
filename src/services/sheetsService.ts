@@ -8,7 +8,7 @@ import {
   SHEET_CONFIGS,
 } from '../types/schemas';
 
-const EDGE_FUNCTION_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sheets-api`;
+const API_URL = '/api/sheets';
 
 function parseNumber(value: string | undefined, fieldName?: string): number {
   if (!value || value === '') {
@@ -42,7 +42,7 @@ export async function fetchSheetData(
   sheetName: string,
   range: string
 ): Promise<string[][]> {
-  const url = `${EDGE_FUNCTION_URL}?spreadsheetId=${encodeURIComponent(
+  const url = `${API_URL}?spreadsheetId=${encodeURIComponent(
     spreadsheetId
   )}&sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(
     range
@@ -52,7 +52,6 @@ export async function fetchSheetData(
 
   const response = await fetch(url, {
     headers: {
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
     },
   });
@@ -280,10 +279,9 @@ export async function writeRefundDetail(
 
   console.log('First row to write:', data[0]);
 
-  const response = await fetch(EDGE_FUNCTION_URL, {
+  const response = await fetch(API_URL, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
