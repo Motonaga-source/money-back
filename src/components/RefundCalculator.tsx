@@ -359,6 +359,11 @@ export default function RefundCalculator() {
 
       const 月額預り金 = user?.月額預り金 || 0;
       const 家賃補助 = user?.家賃補助 || 0;
+      const ユニット家賃 = unit?.家賃 || 0;
+      // 実質負担する家賃 = ユニット本来の家賃 - 家賃補助
+      // マイナスになる（補助の方が多い）場合は0とする（あるいは利益とする？通常は負担0まで）
+      const 実質家賃 = Math.max(0, ユニット家賃 - 家賃補助);
+
       const 日用品 = user?.日用品費 || 0;
       const 修繕積立 = user?.修繕積立金 || 0;
 
@@ -397,19 +402,21 @@ export default function RefundCalculator() {
       const 金銭管理費 = user?.金銭管理費 || 0;
       const 火災保険 = user?.火災保険 || 0;
 
-      const 当月還元金合計 = 月額預り金 - 家賃補助 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険;
+      const 当月還元金合計 = 月額預り金 - 実質家賃 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険;
 
       if (index === 0) {
         console.log(`📊 計算例 (${um.氏名}):`, {
           月額預り金: `${月額預り金.toLocaleString()}円`,
+          ユニット家賃: `${ユニット家賃.toLocaleString()}円`,
           家賃補助: `${家賃補助.toLocaleString()}円`,
+          実質家賃負担: `${実質家賃.toLocaleString()}円 (= ${ユニット家賃} - ${家賃補助})`,
           日用品: `${日用品.toLocaleString()}円`,
           修繕積立: `${修繕積立.toLocaleString()}円`,
           食費: `朝${朝食回数}回×${朝食単価}円 + 昼${昼食回数}回×${昼食単価}円 + 夕${夕食回数}回×${夕食単価}円 + 行事${行事食回数}回×${行事食単価}円 = ${食費合計.toLocaleString()}円`,
           光熱費: `${光熱費総額.toLocaleString()}円 × ${按分率}% ÷ ${ユニット人数}人 = ${光熱費.toLocaleString()}円`,
           金銭管理費: `${金銭管理費.toLocaleString()}円`,
           火災保険: `${火災保険.toLocaleString()}円`,
-          計算式: `${月額預り金.toLocaleString()} - ${家賃補助.toLocaleString()} - ${日用品.toLocaleString()} - ${修繕積立.toLocaleString()} - ${食費合計.toLocaleString()} - ${Math.round(光熱費).toLocaleString()} - ${金銭管理費.toLocaleString()} - ${火災保険.toLocaleString()}`,
+          計算式: `${月額預り金.toLocaleString()} - ${実質家賃.toLocaleString()} - ${日用品.toLocaleString()} - ${修繕積立.toLocaleString()} - ${食費合計.toLocaleString()} - ${Math.round(光熱費).toLocaleString()} - ${金銭管理費.toLocaleString()} - ${火災保険.toLocaleString()}`,
           還元金: `${当月還元金合計.toLocaleString()}円`,
         });
       }
@@ -420,7 +427,7 @@ export default function RefundCalculator() {
         氏名: um.氏名,
         所属ユニット: um.所属ユニット,
         月額預り金: Math.round(月額預り金),
-        家賃: Math.round(家賃補助),
+        家賃: Math.round(実質家賃),
         日用品: Math.round(日用品),
         修繕積立: Math.round(修繕積立),
         食費合計: Math.round(食費合計),
