@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { FileSpreadsheet, Calculator, Download, Save, AlertTriangle, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import {
-  UserMaster,
   UnitManagement,
   UnitMaster,
   UnitUtilityCost,
@@ -55,7 +54,7 @@ export default function RefundCalculator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('userMaster');
+  const [activeTab, setActiveTab] = useState<string>('unitManagement');
 
   const [unitManagement, setUnitManagement] = useState<UnitManagement[]>([]);
   const [unitMaster, setUnitMaster] = useState<UnitMaster[]>([]);
@@ -266,7 +265,7 @@ export default function RefundCalculator() {
       setUnitUtilityCost(unitUtilityCostData);
       setMealCount(mealCountData);
       // 型キャストして初期化
-      setRefundDetail(refundDetailData.map(r => ({
+      setRefundDetail(refundDetailData.map((r: RefundDetail) => ({
         ...r,
         calculated: false,
         家賃補助: 0,
@@ -282,10 +281,6 @@ export default function RefundCalculator() {
       const warnings = validateData(unitManagementData, unitUtilityCostData, mealCountData);
       setValidationWarnings(warnings);
       console.log('⚠️ データ検証:', warnings.length > 0 ? `${warnings.length}件の警告` : '問題なし');
-
-      if (userMasterData.length === 0) {
-        setError('警告: 利用者マスタにデータがありません。シート名とデータを確認してください。');
-      }
     } catch (err) {
       console.error('Error loading data:', err);
       const errorMessage = err instanceof Error ? err.message : 'データの読み込みに失敗しました';
@@ -294,9 +289,18 @@ export default function RefundCalculator() {
       setLoading(false);
     }
   };
-
   const calculateRefunds = () => {
-    const calculated: CalculatedRefund[] = unitManagement.map((um, index) => {
+    let successCount = 0;
+    let warningCount = 0;
+
+    // ユニットごとの人数を月別に計算
+    const unitMemberCount: Record<string, number> = {};
+    unitManagement.forEach(um => {
+      const key = `${um.年月}_${um.所属ユニット}`;
+      unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
+    });
+
+    const calculated: CalculatedRefund[] = unitManagement.map((um: UnitManagement, index: number) => {
       const unit = unitMaster.find((u) => u.ユニット名 === um.所属ユニット);
       const utility = unitUtilityCost.find(
         (u) => u.ユニット名 === um.所属ユニット && u.年月 === um.年月
@@ -470,7 +474,7 @@ export default function RefundCalculator() {
     try {
       console.log(`📤 スプレッドシートに${refundDetail.length}件の還元金明細を書き込み中...`);
 
-      const refundsToWrite: RefundDetail[] = refundDetail.map((r) => ({
+      const refundsToWrite: RefundDetail[] = refundDetail.map((r: CalculatedRefund) => ({
         年月: r.年月,
         利用者ID: r.利用者ID,
         氏名: r.氏名,
