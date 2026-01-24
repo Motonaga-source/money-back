@@ -8,6 +8,7 @@ import {
   SHEET_CONFIGS,
 } from '../types/schemas';
 
+// Cloudflare Pages Functions endpoint
 const API_URL = '/api/sheets';
 
 function parseNumber(value: string | undefined, fieldName?: string): number {
@@ -38,33 +39,47 @@ function parseString(value: string | undefined): string {
 }
 
 export async function fetchSheetData(
-  spreadsheetId: string,
+  _spreadsheetId: string, // Not used - configured in Cloudflare environment
   sheetName: string,
   range: string
 ): Promise<string[][]> {
-  const url = `${API_URL}?spreadsheetId=${encodeURIComponent(
-    spreadsheetId
-  )}&sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(
+  const url = `${API_URL}?sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(
     range
   )}`;
 
-  console.log(`Fetching sheet: ${sheetName}, URL: ${url}`);
+  console.log(`📖 Fetching sheet: ${sheetName}, URL: ${url}`);
 
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    console.error(`Error fetching ${sheetName}:`, error);
-    throw new Error(error.error || 'Failed to fetch sheet data');
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const error = await response.json();
+        console.error(`❌ Error fetching ${sheetName}:`, error);
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        const text = await response.text();
+        console.error(`❌ Non-JSON error response for ${sheetName}:`, text.substring(0, 200));
+        errorMessage = `Server returned HTML instead of JSON. This usually means the API endpoint is not configured correctly.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Data received for ${sheetName}:`, result.data?.length, 'rows');
+    return result.data;
+  } catch (error) {
+    console.error(`❌ Failed to fetch ${sheetName}:`, error);
+    throw error;
   }
-
-  const result = await response.json();
-  console.log(`Data received for ${sheetName}:`, result.data?.length, 'rows');
-  return result.data;
 }
 
 export async function fetchUserMaster(spreadsheetId: string): Promise<UserMaster[]> {
@@ -253,7 +268,7 @@ export async function fetchRefundDetail(spreadsheetId: string): Promise<RefundDe
 }
 
 export async function writeRefundDetail(
-  spreadsheetId: string,
+  _spreadsheetId: string, // Not used - configured in Cloudflare environment
   refunds: RefundDetail[]
 ): Promise<{ success: boolean; updatedRows: number }> {
   const config = SHEET_CONFIGS.refundDetail;
@@ -279,29 +294,44 @@ export async function writeRefundDetail(
 
   console.log('First row to write:', data[0]);
 
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      spreadsheetId,
-      sheetName: config.name,
-      data,
-    }),
-  });
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sheetName: config.name,
+        data,
+      }),
+    });
 
-  if (!response.ok) {
-    const error = await response.json();
-    console.error(`Error writing to ${config.name}:`, error);
-    throw new Error(error.error || 'Failed to write refund detail data');
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const error = await response.json();
+        console.error(`❌ Error writing to ${config.name}:`, error);
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        const text = await response.text();
+        console.error(`❌ Non-JSON error response for ${config.name}:`, text.substring(0, 200));
+        errorMessage = `Server returned HTML instead of JSON. This usually means the API endpoint is not configured correctly.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Successfully wrote ${result.updatedRows} rows to ${config.name}`);
+
+    return {
+      success: result.success,
+      updatedRows: result.updatedRows,
+    };
+  } catch (error) {
+    console.error(`❌ Failed to write to ${config.name}:`, error);
+    throw error;
   }
-
-  const result = await response.json();
-  console.log(`✅ Successfully wrote ${result.updatedRows} rows to ${config.name}`);
-
-  return {
-    success: result.success,
-    updatedRows: result.updatedRows,
-  };
 }
