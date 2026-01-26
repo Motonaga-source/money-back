@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileSpreadsheet, Calculator, Download, Save, AlertTriangle, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import {
   UnitManagement,
@@ -14,6 +14,7 @@ import {
   fetchMealCount,
   fetchRefundDetail,
   writeRefundDetail,
+  writeMealCount,
 } from '../services/sheetsService';
 
 interface CalculatedRefund extends RefundDetail {
@@ -445,7 +446,11 @@ export default function RefundCalculator() {
     setUserSummaries(summaries);
     console.log('📊 利用者別サマリー生成:', summaries.length, '名');
 
-    setActiveTab('refundDetail');
+    // Auto-switch to refundDetail only if we were in unitManagement or unitUtilityCost
+    // If we are in mealInput, we might want to stay there
+    if (activeTab === 'unitManagement' || activeTab === 'unitUtilityCost') {
+      setActiveTab('refundDetail');
+    }
 
     if (warningCount > 0) {
       setError(`⚠️ 計算完了しましたが、${warningCount}件のデータに不足があります。コンソールで詳細を確認してください。`);
@@ -505,14 +510,244 @@ export default function RefundCalculator() {
     }
   };
 
-  const tabs = [
-    { id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
-    { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
-    { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
-    { id: 'mealCount', label: '食数計算', data: mealCount },
-    { id: 'refundDetail', label: '還元金明細', data: refundDetail },
-    { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
-  ];
+  // --- Meal Input Logic ---
+  const [mealInputMonth, setMealInputMonth] = useState<string>('');
+  const [pendingMealChanges, setPendingMealChanges] = useState<Record<string, MealCount>>({});
+
+  // Initialize month when data loads or tab changes
+  useEffect(() => {
+    if (activeTab === 'mealInput' && !mealInputMonth && unitManagement.length > 0) {
+      // Default to the latest month in UnitManagement
+      const months = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
+      if (months.length > 0) {
+        setMealInputMonth(months[months.length - 1]);
+      }
+    }
+  }, [activeTab, unitManagement, mealInputMonth]);
+
+  const handleMealInputChange = (userId: string, field: keyof MealCount, value: number | string) => {
+    setPendingMealChanges(prev => {
+      const currentMeal = prev[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || {
+        月: mealInputMonth,
+        利用者ID: userId,
+        氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
+        ユニット名: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
+        朝食: 0,
+        昼食: 0,
+        夕食: 0,
+        行事食: 0,
+        備考: '',
+      };
+
+      return {
+        ...prev,
+        [userId]: {
+          ...currentMeal,
+          [field]: value
+        }
+      };
+    });
+  };
+
+  const getMealValue = (userId: string): MealCount => {
+    if (pendingMealChanges[userId]) {
+      return pendingMealChanges[userId];
+    }
+    const existing = mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth);
+    if (existing) return existing;
+
+    const user = unitManagement.find(u => u.利用者ID === userId && u.年月 === mealInputMonth);
+    return {
+      月: mealInputMonth,
+      利用者ID: userId,
+      氏名: user?.氏名 || '',
+      ユニット名: user?.所属ユニット || '',
+      朝食: 0,
+      昼食: 0,
+      夕食: 0,
+      行事食: 0,
+      備考: '',
+    };
+  };
+
+  const saveMealCounts = async () => {
+    if (!mealInputMonth) return;
+
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      // 1. Merge pending changes into complete mealCount list
+      // existing records are replaced, new ones (for this month) are added
+      // global mealCount needs to be updated with overrides from pendingMealChanges
+
+      const newMealCounts = [...mealCount];
+
+      // Filter out existing records for the current month that are being updated
+      // checking logic: if we have a pending change for user X in month Y, 
+      // we need to make sure we update the entry in the main list.
+
+      const updates = Object.values(pendingMealChanges).filter(m => m.月 === mealInputMonth);
+
+      if (updates.length === 0) {
+        setLoading(false);
+        return; // Nothing to save
+      }
+
+      // Create a map for easier access to existing records
+      // Key: "Month_UserID"
+      const mealMap = new Map(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
+
+      // Apply updates
+      updates.forEach(update => {
+        mealMap.set(`${update.月}_${update.利用者ID}`, update);
+      });
+
+      const finalMealCounts = Array.from(mealMap.values());
+
+      // 2. Write to sheet
+      const result = await writeMealCount(spreadsheetId, finalMealCounts);
+
+      // 3. Update local state
+      setMealCount(finalMealCounts);
+      setPendingMealChanges({});
+      setSuccessMessage(`✅ ${mealInputMonth}分の食数データを保存しました (${result.updatedRows}行)`);
+
+    } catch (err: any) {
+      console.error('Save meal error:', err);
+      setError(`保存に失敗しました: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const renderMealInput = () => {
+    if (unitManagement.length === 0) {
+      return (
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-sm">データが読み込まれていません。</p>
+        </div>
+      );
+    }
+
+    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
+
+    // Filter users belonging to the selected month in UnitManagement
+    // This ensures we only show active users for that month
+    const activeUsers = unitManagement
+      .filter(u => u.年月 === mealInputMonth)
+      .sort((a, b) => a.所属ユニット.localeCompare(b.所属ユニット) || a.氏名.localeCompare(b.氏名));
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <label className="text-sm font-medium text-gray-700">対象月:</label>
+            <select
+              value={mealInputMonth}
+              onChange={(e) => {
+                setMealInputMonth(e.target.value);
+                setPendingMealChanges({});
+              }}
+              className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+            >
+              {availableMonths.map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-500 ml-2">
+              対象者: {activeUsers.length}名
+            </span>
+          </div>
+          <button
+            onClick={saveMealCounts}
+            disabled={Object.keys(pendingMealChanges).length === 0 || loading}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+          >
+            <Save className="w-4 h-4 mr-2" />
+            保存する
+          </button>
+        </div>
+
+        <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">氏名 / ユニット</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">朝食</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">昼食</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">夕食</th>
+                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">行事食</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備考</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {activeUsers.map((user) => {
+                const mealData = getMealValue(user.利用者ID);
+                const hasChanges = !!pendingMealChanges[user.利用者ID];
+
+                return (
+                  <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
+                      <div className="text-sm text-gray-500">{user.所属ユニット}</div>
+                    </td>
+                    <td className="px-2 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={mealData.朝食}
+                        onChange={(e) => handleMealInputChange(user.利用者ID, '朝食', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-2 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={mealData.昼食}
+                        onChange={(e) => handleMealInputChange(user.利用者ID, '昼食', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-2 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={mealData.夕食}
+                        onChange={(e) => handleMealInputChange(user.利用者ID, '夕食', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-2 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        min="0"
+                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={mealData.行事食}
+                        onChange={(e) => handleMealInputChange(user.利用者ID, '行事食', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <input
+                        type="text"
+                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={mealData.備考 || ''}
+                        placeholder="メモ"
+                        onChange={(e) => handleMealInputChange(user.利用者ID, '備考', e.target.value)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
 
   const toggleUserExpansion = (userId: string) => {
     const newExpanded = new Set(expandedUsers);
@@ -523,6 +758,16 @@ export default function RefundCalculator() {
     }
     setExpandedUsers(newExpanded);
   };
+
+  const tabs = [
+    { id: 'mealInput', label: '食数入力', data: [] },
+    { id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
+    { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
+    { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
+    { id: 'mealCount', label: '食数計算(参照)', data: mealCount },
+    { id: 'refundDetail', label: '還元金明細', data: refundDetail },
+    { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
+  ];
 
   const renderTable = () => {
     const activeData = tabs.find((t) => t.id === activeTab)?.data || [];
@@ -660,6 +905,10 @@ export default function RefundCalculator() {
           })}
         </div>
       );
+    }
+
+    if (activeTab === 'mealInput') {
+      return renderMealInput();
     }
 
     if (activeData.length === 0) {

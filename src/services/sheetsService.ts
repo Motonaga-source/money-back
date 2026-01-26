@@ -313,3 +313,67 @@ export async function writeRefundDetail(
     throw error;
   }
 }
+
+export async function writeMealCount(
+  _spreadsheetId: string, // Not used - configured in Cloudflare environment
+  meals: MealCount[]
+): Promise<{ success: boolean; updatedRows: number }> {
+  const config = SHEET_CONFIGS.mealCount;
+
+  console.log(`📝 Writing ${meals.length} meal records to ${config.name}...`);
+
+  const data = meals.map((meal) => [
+    meal.月,
+    meal.利用者ID,
+    meal.氏名,
+    meal.ユニット名,
+    meal.朝食,
+    meal.昼食,
+    meal.夕食,
+    meal.行事食,
+    meal.備考,
+  ]);
+
+  console.log('First row to write:', data[0]);
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sheetName: config.name,
+        data,
+      }),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const error = await response.json();
+        console.error(`❌ Error writing to ${config.name}:`, error);
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        const text = await response.text();
+        console.error(`❌ Non-JSON error response for ${config.name}:`, text.substring(0, 200));
+        errorMessage = `Server returned HTML instead of JSON. This usually means the API endpoint is not configured correctly.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Successfully wrote ${result.updatedRows} rows to ${config.name}`);
+
+    return {
+      success: result.success,
+      updatedRows: result.updatedRows,
+    };
+  } catch (error) {
+    console.error(`❌ Failed to write to ${config.name}:`, error);
+    throw error;
+  }
+}
