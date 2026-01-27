@@ -17,12 +17,24 @@ import {
   writeMealCount,
 } from '../services/sheetsService';
 
+interface CalculationDetail {
+  count: number;
+  unitPrice: number;
+  total: number;
+}
+
 interface CalculatedRefund extends RefundDetail {
   calculated: boolean;
   家賃補助: number;
   朝食費: number;
   昼食費: number;
   夕食費: number;
+  details?: {
+    breakfast: CalculationDetail;
+    lunch: CalculationDetail;
+    dinner: CalculationDetail;
+    event: CalculationDetail;
+  };
 }
 
 interface UnitChange {
@@ -426,6 +438,12 @@ export default function RefundCalculator() {
         繰越金: 0,
         当月還元金合計: Math.round(当月還元金合計),
         calculated: true,
+        details: {
+          breakfast: { count: 朝食回数, unitPrice: 朝食単価, total: 朝食費 },
+          lunch: { count: 昼食回数, unitPrice: 昼食単価, total: 昼食費 },
+          dinner: { count: 夕食回数, unitPrice: 夕食単価, total: 夕食費 },
+          event: { count: 行事食回数, unitPrice: 行事食単価, total: 行事食費 },
+        }
       };
 
       return result;
@@ -838,9 +856,9 @@ export default function RefundCalculator() {
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃補助</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">光熱費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">朝食費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">昼食費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">夕食費</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">朝食費</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">昼食費</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">夕食費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">修繕積立金</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">日用品費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">金銭管理費</th>
@@ -869,13 +887,29 @@ export default function RefundCalculator() {
                                   {r.光熱費.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.朝食費.toLocaleString()}
+                                  <div className="font-medium">{r.朝食費.toLocaleString()}</div>
+                                  {r.details && (
+                                    <div className="text-[10px] text-gray-500">
+                                      @{r.details.breakfast.unitPrice}×{r.details.breakfast.count}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.昼食費.toLocaleString()}
+                                  <div className="font-medium">{r.昼食費.toLocaleString()}</div>
+                                  {r.details && (
+                                    <div className="text-[10px] text-gray-500">
+                                      @{r.details.lunch.unitPrice}×{r.details.lunch.count}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.夕食費.toLocaleString()}
+                                  <div className="font-medium">{r.夕食費.toLocaleString()}</div>
+                                  {r.details && (
+                                    <div className="text-[10px] text-gray-500">
+                                      @{r.details.dinner.unitPrice}×{r.details.dinner.count}
+                                      {r.details.event.total > 0 && ` +行事${r.details.event.total}`}
+                                    </div>
+                                  )}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
                                   {r.修繕積立.toLocaleString()}
@@ -1093,6 +1127,30 @@ export default function RefundCalculator() {
               {successMessage}
             </div>
           )}
+        </div>
+
+        <div className="mb-4 flex flex-col gap-2">
+          <details className="text-sm text-gray-500 cursor-pointer p-2 border rounded hover:bg-gray-50">
+            <summary>🔍 データインスペクター (最初のレコード)</summary>
+            <div className="mt-2 space-y-4 p-2">
+              {unitManagement.length > 0 && (
+                <div>
+                  <p className="font-bold text-xs uppercase text-gray-700">ユニット管理 (UnitManagement)</p>
+                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(unitManagement[0], null, 2)}
+                  </pre>
+                </div>
+              )}
+              {mealCount.length > 0 && (
+                <div>
+                  <p className="font-bold text-xs uppercase text-gray-700">食数データ (MealCount)</p>
+                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                    {JSON.stringify(mealCount[0], null, 2)}
+                  </pre>
+                </div>
+              )}
+            </div>
+          </details>
         </div>
 
         {unitChanges.length > 0 && (

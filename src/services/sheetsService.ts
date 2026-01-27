@@ -1,5 +1,4 @@
 import {
-  UserMaster,
   UnitManagement,
   UnitMaster,
   UnitUtilityCost,
@@ -91,10 +90,18 @@ export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitMa
   console.log('Raw UnitManagement rows (first 2):', rows.slice(0, 2));
 
   const data = rows.slice(1).map((row, index) => {
+    const rawId = parseString(row[1]);
+    const rawName = parseString(row[2]);
+
+    // Validation warning for potential column swap
+    if (index < 5 && rawId.length > rawName.length && !rawId.match(/^[A-Za-z0-9]+$/)) {
+      console.warn(`⚠️ Potential Column Swap Detected in UnitManagement row ${index + 2}: ID="${rawId}", Name="${rawName}". ID usually is shorter and alphanumeric.`);
+    }
+
     const parsed = {
       年月: parseString(row[0]),
-      利用者ID: parseString(row[1]),
-      氏名: parseString(row[2]),
+      利用者ID: rawId,
+      氏名: rawName,
       所属ユニット: parseString(row[3]),
       月額預り金: parseNumber(row[4], '月額預り金'),
       家賃補助: parseNumber(row[5], '家賃補助'),
@@ -185,10 +192,18 @@ export async function fetchMealCount(spreadsheetId: string): Promise<MealCount[]
   console.log('Raw MealCount rows (first 2):', rows.slice(0, 2));
 
   const data = rows.slice(1).map((row, index) => {
+    const rawId = parseString(row[1]);
+    const rawName = parseString(row[2]);
+
+    // Validation warning for potential column swap
+    if (index < 5 && rawId.length > rawName.length && !rawId.match(/^[A-Za-z0-9]+$/)) {
+      console.warn(`⚠️ Potential Column Swap Detected in MealCount row ${index + 2}: ID="${rawId}", Name="${rawName}". ID usually is shorter and alphanumeric.`);
+    }
+
     const parsed = {
       月: parseString(row[0]),
-      利用者ID: parseString(row[1]),
-      氏名: parseString(row[2]),
+      利用者ID: rawId,
+      氏名: rawName,
       ユニット名: parseString(row[3]),
       朝食: parseNumber(row[4], '朝食'),
       昼食: parseNumber(row[5], '昼食'),
