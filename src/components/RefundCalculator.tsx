@@ -26,6 +26,7 @@ interface CalculationDetail {
 interface CalculatedRefund extends RefundDetail {
   calculated: boolean;
   家賃補助: number;
+  ユニット家賃: number; // For display purposes (original rent before subsidy)
   朝食費: number;
   昼食費: number;
   夕食費: number;
@@ -282,6 +283,7 @@ export default function RefundCalculator() {
         ...r,
         calculated: false,
         家賃補助: 0,
+        ユニット家賃: 0,
         朝食費: 0,
         昼食費: 0,
         夕食費: 0
@@ -425,6 +427,7 @@ export default function RefundCalculator() {
         所属ユニット: um.所属ユニット,
         月額預り金: Math.round(月額預り金),
         家賃: Math.round(実質家賃),
+        ユニット家賃: Math.round(ユニット家賃), // Store original unit rent
         家賃補助: Math.round(家賃補助),
         日用品: Math.round(日用品),
         修繕積立: Math.round(修繕積立),
@@ -690,7 +693,7 @@ export default function RefundCalculator() {
 
         <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">氏名 / ユニット</th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">朝食</th>
@@ -848,7 +851,7 @@ export default function RefundCalculator() {
                   <div className="bg-white p-4">
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50">
+                        <thead className="bg-gray-50 sticky top-0 z-10">
                           <tr>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">年月</th>
                             <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">ユニット</th>
@@ -878,7 +881,7 @@ export default function RefundCalculator() {
                                   {r.月額預り金.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.家賃.toLocaleString()}
+                                  {r.ユニット家賃 ? r.ユニット家賃.toLocaleString() : r.家賃.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
                                   {r.家賃補助.toLocaleString()}
@@ -1044,7 +1047,7 @@ export default function RefundCalculator() {
 
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
                 {headers.map((header) => (
                   <th
