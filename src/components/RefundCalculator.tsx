@@ -959,7 +959,7 @@ export default function RefundCalculator() {
       );
     }
 
-    const headers = Object.keys(activeData[0]).filter(key => key !== 'calculated');
+    const headers = Object.keys(activeData[0]).filter(key => key !== 'calculated' && key !== 'details');
     console.log('Rendering table with headers:', headers);
     console.log('First row data:', activeData[0]);
 
