@@ -26,8 +26,7 @@ interface CalculationDetail {
 
 interface CalculatedRefund extends RefundDetail {
   calculated: boolean;
-  家賃補助: number;
-  ユニット家賃: number; // For display purposes (original rent before subsidy)
+  ユニット家賃?: number; // Kept for backward compatibility during transition if needed, but using RefundDetail.家賃 now
   朝食費: number;
   昼食費: number;
   夕食費: number;
@@ -227,7 +226,8 @@ export default function RefundCalculator() {
 
       const summary = userMap[refund.利用者ID];
       summary.年間預り金合計 += refund.月額預り金;
-      summary.年間支出合計 += refund.家賃 + refund.日用品 + refund.修繕積立 +
+      // 実質的な支出 = 家賃(満額) + 家賃補助(マイナス) + その他
+      summary.年間支出合計 += refund.家賃 + refund.家賃補助 + refund.日用品 + refund.修繕積立 +
         refund.食費合計 + refund.光熱費 + refund.金銭管理費 + refund.火災保険;
       summary.年間還元金合計 += refund.当月還元金合計;
       summary.月別データ.push(refund);
@@ -427,8 +427,7 @@ export default function RefundCalculator() {
         氏名: um.氏名,
         所属ユニット: um.所属ユニット,
         月額預り金: Math.round(月額預り金),
-        家賃: Math.round(実質家賃),
-        ユニット家賃: Math.round(ユニット家賃), // Store original unit rent
+        家賃: Math.round(ユニット家賃), // Store original unit rent (満額)
         家賃補助: Math.round(家賃補助),
         日用品: Math.round(日用品),
         修繕積立: Math.round(修繕積立),
@@ -458,7 +457,7 @@ export default function RefundCalculator() {
     console.log(`✅ 計算完了: ${calculated.length}件 (成功: ${successCount}, 警告: ${warningCount})`);
     console.log('計算結果サマリー:', {
       総預り金: calculated.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString() + '円',
-      総支出: calculated.reduce((sum, r) => sum + (r.家賃 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString() + '円',
+      総支出: calculated.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString() + '円',
       総還元金: totalRefund.toLocaleString() + '円',
     });
 
@@ -1177,7 +1176,7 @@ export default function RefundCalculator() {
                                   {r.月額預り金.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.ユニット家賃 ? r.ユニット家賃.toLocaleString() : r.家賃.toLocaleString()}
+                                  {r.家賃.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
                                   {r.家賃補助.toLocaleString()}
@@ -1284,7 +1283,7 @@ export default function RefundCalculator() {
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-600 mb-1">総支出</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString()}円
+                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString()}円
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm">

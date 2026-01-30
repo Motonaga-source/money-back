@@ -52,6 +52,7 @@ export interface RefundDetail {
   所属ユニット: string;
   月額預り金: number;
   家賃: number;
+  家賃補助: number;
   日用品: number;
   修繕積立: number;
   食費合計: number;
@@ -72,5 +73,5 @@ export const SHEET_CONFIGS: Record<string, SheetConfig> = {
   unitMaster: { name: 'ユニットマスタ', range: 'A:C' },
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },
-  refundDetail: { name: '還元金明細', range: 'A:N' },
+  refundDetail: { name: '還元金明細', range: 'A:O' },
 };
