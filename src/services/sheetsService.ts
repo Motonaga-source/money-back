@@ -392,3 +392,70 @@ export async function writeMealCount(
     throw error;
   }
 }
+export async function writeUnitManagement(
+  _spreadsheetId: string, // Not used - configured in Cloudflare environment
+  data: UnitManagement[]
+): Promise<{ success: boolean; updatedRows: number }> {
+  const config = SHEET_CONFIGS.unitManagement;
+
+  console.log(`📝 Writing ${data.length} unit management records to ${config.name}...`);
+
+  const rows = data.map((item) => [
+    item.年月,
+    item.利用者ID,
+    item.氏名,
+    item.所属ユニット,
+    item.月額預り金,
+    item.家賃補助,
+    item.日用品費,
+    item.修繕積立金,
+    item.朝食費,
+    item.昼食費,
+    item.夕食費,
+    item.行事食,
+    item.金銭管理費,
+    item.火災保険,
+    item.備考,
+  ]);
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sheetName: config.name,
+        data: rows,
+      }),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const error = await response.json();
+        console.error(`❌ Error writing to ${config.name}:`, error);
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        const text = await response.text();
+        console.error(`❌ Non-JSON error response for ${config.name}:`, text.substring(0, 200));
+        errorMessage = `Server returned HTML instead of JSON. This usually means the API endpoint is not configured correctly.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Successfully wrote ${result.updatedRows} rows to ${config.name}`);
+
+    return {
+      success: result.success,
+      updatedRows: result.updatedRows,
+    };
+  } catch (error) {
+    console.error(`❌ Failed to write to ${config.name}:`, error);
+    throw error;
+  }
+}
