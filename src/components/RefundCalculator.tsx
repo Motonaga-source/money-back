@@ -358,7 +358,7 @@ export default function RefundCalculator() {
 
       const 月額預り金 = um.月額預り金 || 0;
       const 家賃補助 = um.家賃補助 || 0;
-      const ユニット家賃 = unit?.家賃 || 0;
+      const ユニット家賃 = um.家賃 || 0;
 
       // 実質負担する家賃 = ユニット本来の家賃 + 家賃補助 (家賃補助がマイナス値のため足し算)
       const 実質家賃 = Math.max(0, ユニット家賃 + 家賃補助);
@@ -563,6 +563,7 @@ export default function RefundCalculator() {
         氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
         所属ユニット: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
         月額預り金: 0,
+        家賃: 0,
         家賃補助: 0,
         日用品費: 0,
         修繕積立金: 0,
@@ -599,6 +600,7 @@ export default function RefundCalculator() {
       氏名: user?.氏名 || '',
       所属ユニット: user?.所属ユニット || '',
       月額預り金: 0,
+      家賃: 0,
       家賃補助: 0,
       日用品費: 0,
       修繕積立金: 0,
@@ -627,13 +629,13 @@ export default function RefundCalculator() {
         return;
       }
 
-      const unitMap = new Map(unitManagement.map(u => [`${u.年月}_${u.利用者ID}`, u]));
+      const unitMap = new Map<string, UnitManagement>(unitManagement.map(u => [`${u.年月}_${u.利用者ID}`, u]));
 
-      updates.forEach(update => {
+      updates.forEach((update: UnitManagement) => {
         unitMap.set(`${update.年月}_${update.利用者ID}`, update);
       });
 
-      const finalUnitManagement = Array.from(unitMap.values());
+      const finalUnitManagement: UnitManagement[] = Array.from(unitMap.values());
 
       const result = await writeUnitManagement(spreadsheetId, finalUnitManagement);
 
@@ -700,6 +702,7 @@ export default function RefundCalculator() {
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">氏名 / ユニット</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">月額預り金</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃補助</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">日用品費</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">修繕積立</th>
@@ -729,6 +732,14 @@ export default function RefundCalculator() {
                         className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
                         value={unitData.月額預り金}
                         onChange={(e) => handleUnitInputChange(user.利用者ID, '月額預り金', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-1 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={unitData.家賃}
+                        onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃', Number(e.target.value))}
                       />
                     </td>
                     <td className="px-1 py-4 whitespace-nowrap text-center">
@@ -894,14 +905,14 @@ export default function RefundCalculator() {
 
       // Create a map for easier access to existing records
       // Key: "Month_UserID"
-      const mealMap = new Map(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
+      const mealMap = new Map<string, MealCount>(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
 
       // Apply updates
-      updates.forEach(update => {
+      updates.forEach((update: MealCount) => {
         mealMap.set(`${update.月}_${update.利用者ID}`, update);
       });
 
-      const finalMealCounts = Array.from(mealMap.values());
+      const finalMealCounts: MealCount[] = Array.from(mealMap.values());
 
       // 2. Write to sheet
       const result = await writeMealCount(spreadsheetId, finalMealCounts);

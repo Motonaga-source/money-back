@@ -4,6 +4,7 @@ export interface UnitManagement {
   氏名: string;
   所属ユニット: string;
   月額預り金: number;
+  家賃: number;
   家賃補助: number;
   日用品費: number;
   修繕積立金: number;
@@ -67,7 +68,7 @@ export interface SheetConfig {
 }
 
 export const SHEET_CONFIGS: Record<string, SheetConfig> = {
-  unitManagement: { name: 'ユニット管理', range: 'A:O' },
+  unitManagement: { name: 'ユニット管理', range: 'A:P' },
   unitMaster: { name: 'ユニットマスタ', range: 'A:C' },
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },
