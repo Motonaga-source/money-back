@@ -237,7 +237,7 @@ export default function RefundCalculator() {
       summary.月別データ.sort((a, b) => sortByFiscalYear(a.年月, b.年月));
     });
 
-    return Object.values(userMap).sort((a, b) => a.氏名.localeCompare(b.氏名));
+    return Object.values(userMap).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
   };
 
   const loadAllData = async () => {
@@ -666,7 +666,7 @@ export default function RefundCalculator() {
     const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
     const activeUsers = unitManagement
       .filter(u => u.年月 === unitInputMonth)
-      .sort((a, b) => a.所属ユニット.localeCompare(b.所属ユニット) || a.氏名.localeCompare(b.氏名));
+      .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
 
     return (
       <div className="space-y-6">
@@ -697,185 +697,183 @@ export default function RefundCalculator() {
             <Save className="w-4 h-4 mr-2" />
             保存する
           </button>
-        </div>
+          <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">氏名 / ユニット</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">月額預り金</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃補助</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">日用品費</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">修繕積立</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">朝食単価</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">昼食単価</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">夕食単価</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">行事単価</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">共益費</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">金銭管理</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">火災保険</th>
+                  <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">食材費</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">備考</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {activeUsers.map((user) => {
+                  const unitData = getUnitValue(user.利用者ID);
+                  const hasChanges = !!pendingUnitChanges[user.利用者ID];
 
-        <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">氏名 / ユニット</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">月額預り金</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃補助</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">日用品費</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">修繕積立</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">朝食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">昼食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">夕食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">行事単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">共益費</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">金銭管理</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">火災保険</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">食材費</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">備考</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeUsers.map((user) => {
-                const unitData = getUnitValue(user.利用者ID);
-                const hasChanges = !!pendingUnitChanges[user.利用者ID];
-
-                return (
-                  <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
-                    <td className="px-4 py-4 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                      <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
-                      <div className="text-sm text-gray-500">{user.所属ユニット}</div>
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.月額預り金}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '月額預り金', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.家賃}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.家賃補助}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃補助', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.日用品費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '日用品費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.修繕積立金}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '修繕積立金', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.朝食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '朝食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.昼食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '昼食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.夕食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '夕食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.行事食}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '行事食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.共益費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '共益費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.金銭管理費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '金銭管理費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.火災保険}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '火災保険', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.食材費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '食材費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.備考 || ''}
-                        placeholder="メモ"
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '備考', e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
+                      <td className="px-4 py-4 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                        <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
+                        <div className="text-sm text-gray-500">{user.所属ユニット}</div>
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.月額預り金}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '月額預り金', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.家賃}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.家賃補助}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃補助', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.日用品費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '日用品費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.修繕積立金}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '修繕積立金', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.朝食費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '朝食費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.昼食費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '昼食費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.夕食費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '夕食費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.行事食}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '行事食', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.共益費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '共益費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.金銭管理費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '金銭管理費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.火災保険}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '火災保険', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-1 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.食材費}
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '食材費', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="text"
+                          className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={unitData.備考 || ''}
+                          placeholder="メモ"
+                          onChange={(e) => handleUnitInputChange(user.利用者ID, '備考', e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    );
+        );
   };
 
   const handleMealInputChange = (userId: string, field: keyof MealCount, value: number | string) => {
-    setPendingMealChanges(prev => {
-      const currentMeal = prev[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || {
-        月: mealInputMonth,
-        利用者ID: userId,
-        氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
-        ユニット名: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
-        朝食: 0,
-        昼食: 0,
-        夕食: 0,
-        行事食: 0,
-        備考: '',
-      };
+          setPendingMealChanges(prev => {
+            const currentMeal = prev[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || {
+              月: mealInputMonth,
+              利用者ID: userId,
+              氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
+              ユニット名: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
+              朝食: 0,
+              昼食: 0,
+              夕食: 0,
+              行事食: 0,
+              備考: '',
+            };
 
-      return {
-        ...prev,
-        [userId]: {
-          ...currentMeal,
-          [field]: value
-        }
-      };
-    });
+            return {
+              ...prev,
+              [userId]: {
+                ...currentMeal,
+                [field]: value
+              }
+            };
+          });
   };
 
   const getMealValue = (userId: string): MealCount => {
@@ -883,30 +881,30 @@ export default function RefundCalculator() {
       return pendingMealChanges[userId];
     }
     const existing = mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth);
-    if (existing) return existing;
+        if (existing) return existing;
 
     const user = unitManagement.find(u => u.利用者ID === userId && u.年月 === mealInputMonth);
-    return {
-      月: mealInputMonth,
-      利用者ID: userId,
-      氏名: user?.氏名 || '',
-      ユニット名: user?.所属ユニット || '',
-      朝食: 0,
-      昼食: 0,
-      夕食: 0,
-      行事食: 0,
-      備考: '',
+        return {
+          月: mealInputMonth,
+        利用者ID: userId,
+        氏名: user?.氏名 || '',
+        ユニット名: user?.所属ユニット || '',
+        朝食: 0,
+        昼食: 0,
+        夕食: 0,
+        行事食: 0,
+        備考: '',
     };
   };
 
   const saveMealCounts = async () => {
     if (!mealInputMonth) return;
 
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
+        setLoading(true);
+        setError(null);
+        setSuccessMessage(null);
 
-    try {
+        try {
       // 1. Merge pending changes into complete mealCount list
       // existing records are replaced, new ones (for this month) are added
       // global mealCount needs to be updated with overrides from pendingMealChanges
@@ -919,35 +917,35 @@ export default function RefundCalculator() {
 
       const updates = Object.values(pendingMealChanges).filter(m => m.月 === mealInputMonth);
 
-      if (updates.length === 0) {
-        setLoading(false);
+        if (updates.length === 0) {
+          setLoading(false);
         return; // Nothing to save
       }
 
-      // Create a map for easier access to existing records
-      // Key: "Month_UserID"
-      const mealMap = new Map<string, MealCount>(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
+        // Create a map for easier access to existing records
+        // Key: "Month_UserID"
+        const mealMap = new Map<string, MealCount>(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
 
       // Apply updates
       updates.forEach((update: MealCount) => {
-        mealMap.set(`${update.月}_${update.利用者ID}`, update);
+          mealMap.set(`${update.月}_${update.利用者ID}`, update);
       });
 
-      const finalMealCounts: MealCount[] = Array.from(mealMap.values());
+        const finalMealCounts: MealCount[] = Array.from(mealMap.values());
 
-      // 2. Write to sheet
-      const result = await writeMealCount(spreadsheetId, finalMealCounts);
+        // 2. Write to sheet
+        const result = await writeMealCount(spreadsheetId, finalMealCounts);
 
-      // 3. Update local state
-      setMealCount(finalMealCounts);
-      setPendingMealChanges({});
-      setSuccessMessage(`✅ ${mealInputMonth}分の食数データを保存しました (${result.updatedRows}行)`);
+        // 3. Update local state
+        setMealCount(finalMealCounts);
+        setPendingMealChanges({ });
+        setSuccessMessage(`✅ ${mealInputMonth}分の食数データを保存しました (${result.updatedRows}行)`);
 
     } catch (err: any) {
-      console.error('Save meal error:', err);
-      setError(`保存に失敗しました: ${err.message}`);
+          console.error('Save meal error:', err);
+        setError(`保存に失敗しました: ${err.message}`);
     } finally {
-      setLoading(false);
+          setLoading(false);
     }
   };
 
@@ -957,170 +955,170 @@ export default function RefundCalculator() {
         <div className="text-center py-12 text-gray-500">
           <p className="text-sm">データが読み込まれていません。</p>
         </div>
-      );
+        );
     }
 
     const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
 
-    // Filter users belonging to the selected month in UnitManagement
-    // This ensures we only show active users for that month
-    const activeUsers = unitManagement
+        // Filter users belonging to the selected month in UnitManagement
+        // This ensures we only show active users for that month
+        const activeUsers = unitManagement
       .filter(u => u.年月 === mealInputMonth)
-      .sort((a, b) => a.所属ユニット.localeCompare(b.所属ユニット) || a.氏名.localeCompare(b.氏名));
+      .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
 
-    return (
-      <div className="space-y-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">対象月:</label>
-            <select
-              value={mealInputMonth}
-              onChange={(e) => {
-                setMealInputMonth(e.target.value);
-                setPendingMealChanges({});
-              }}
-              className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+        return (
+        <div className="space-y-6">
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">対象月:</label>
+              <select
+                value={mealInputMonth}
+                onChange={(e) => {
+                  setMealInputMonth(e.target.value);
+                  setPendingMealChanges({});
+                }}
+                className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+              >
+                {availableMonths.map(m => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+              <span className="text-sm text-gray-500 ml-2">
+                対象者: {activeUsers.length}名
+              </span>
+            </div>
+            <button
+              onClick={saveMealCounts}
+              disabled={Object.keys(pendingMealChanges).length === 0 || loading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
             >
-              {availableMonths.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-500 ml-2">
-              対象者: {activeUsers.length}名
-            </span>
+              <Save className="w-4 h-4 mr-2" />
+              保存する
+            </button>
           </div>
-          <button
-            onClick={saveMealCounts}
-            disabled={Object.keys(pendingMealChanges).length === 0 || loading}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            保存する
-          </button>
-        </div>
 
-        <div className="bg-white shadow overflow-hidden border-b border-gray-200 sm:rounded-lg overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">氏名 / ユニット</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">朝食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">昼食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">夕食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">行事食</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備考</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeUsers.map((user) => {
-                const mealData = getMealValue(user.利用者ID);
-                const hasChanges = !!pendingMealChanges[user.利用者ID];
+          <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">氏名 / ユニット</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">朝食</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">昼食</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">夕食</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">行事食</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備考</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {activeUsers.map((user) => {
+                  const mealData = getMealValue(user.利用者ID);
+                  const hasChanges = !!pendingMealChanges[user.利用者ID];
 
-                return (
-                  <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
-                      <div className="text-sm text-gray-500">{user.所属ユニット}</div>
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.朝食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '朝食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.昼食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '昼食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.夕食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '夕食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.行事食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '行事食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.備考 || ''}
-                        placeholder="メモ"
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '備考', e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
+                        <div className="text-sm text-gray-500">{user.所属ユニット}</div>
+                      </td>
+                      <td className="px-2 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={mealData.朝食}
+                          onChange={(e) => handleMealInputChange(user.利用者ID, '朝食', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-2 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={mealData.昼食}
+                          onChange={(e) => handleMealInputChange(user.利用者ID, '昼食', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-2 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={mealData.夕食}
+                          onChange={(e) => handleMealInputChange(user.利用者ID, '夕食', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-2 py-4 whitespace-nowrap text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={mealData.行事食}
+                          onChange={(e) => handleMealInputChange(user.利用者ID, '行事食', Number(e.target.value))}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <input
+                          type="text"
+                          className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                          value={mealData.備考 || ''}
+                          placeholder="メモ"
+                          onChange={(e) => handleMealInputChange(user.利用者ID, '備考', e.target.value)}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    );
+        );
   };
 
 
   const toggleUserExpansion = (userId: string) => {
     const newExpanded = new Set(expandedUsers);
-    if (newExpanded.has(userId)) {
-      newExpanded.delete(userId);
+        if (newExpanded.has(userId)) {
+          newExpanded.delete(userId);
     } else {
-      newExpanded.add(userId);
+          newExpanded.add(userId);
     }
-    setExpandedUsers(newExpanded);
+        setExpandedUsers(newExpanded);
   };
 
-  const tabs = [
-    { id: 'mealInput', label: '食数入力', data: [] },
-    { id: 'unitInput', label: 'ユニット入力', data: [] },
-    { id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
-    { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
-    { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
-    { id: 'mealCount', label: '食数計算(参照)', data: mealCount },
-    { id: 'refundDetail', label: '還元金明細', data: refundDetail },
-    { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
-  ];
+        const tabs = [
+        {id: 'mealInput', label: '食数入力', data: [] },
+        {id: 'unitInput', label: 'ユニット入力', data: [] },
+        {id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
+        {id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
+        {id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
+        {id: 'mealCount', label: '食数計算(参照)', data: mealCount },
+        {id: 'refundDetail', label: '還元金明細', data: refundDetail },
+        {id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
+        ];
 
   const renderTable = () => {
     if (activeTab === 'mealInput') {
       return renderMealInput();
     }
 
-    if (activeTab === 'unitInput') {
+        if (activeTab === 'unitInput') {
       return renderUnitInput();
     }
 
     const activeData = tabs.find((t) => t.id === activeTab)?.data || [];
 
-    if (activeTab === 'userSummary') {
+        if (activeTab === 'userSummary') {
       if (userSummaries.length === 0) {
         return (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg mb-2">データがありません</p>
-            <p className="text-sm">「還元金計算」ボタンをクリックして計算を実行してください</p>
-          </div>
+        <div className="text-center py-12 text-gray-500">
+          <p className="text-lg mb-2">データがありません</p>
+          <p className="text-sm">「還元金計算」ボタンをクリックして計算を実行してください</p>
+        </div>
         );
       }
 
-      return (
+        return (
         <div className="space-y-3">
           {userSummaries.map((summary) => {
             const isExpanded = expandedUsers.has(summary.利用者ID);
@@ -1266,14 +1264,14 @@ export default function RefundCalculator() {
             );
           })}
         </div>
-      );
+        );
     }
 
-    if (activeTab === 'mealInput') {
+        if (activeTab === 'mealInput') {
       return renderMealInput();
     }
 
-    if (activeData.length === 0) {
+        if (activeData.length === 0) {
       return (
         <div className="text-center py-12 text-gray-500">
           <p className="text-lg mb-2">データがありません</p>
@@ -1284,311 +1282,311 @@ export default function RefundCalculator() {
             }
           </p>
         </div>
-      );
+        );
     }
 
     const headers = Object.keys(activeData[0]).filter(key => key !== 'calculated' && key !== 'details');
-    console.log('Rendering table with headers:', headers);
-    console.log('First row data:', activeData[0]);
+        console.log('Rendering table with headers:', headers);
+        console.log('First row data:', activeData[0]);
 
     const isRefundDetail = activeTab === 'refundDetail' && activeData.length > 0;
-    const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
+        const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
 
-    return (
-      <>
-        {isRefundDetail && calculatedData.length > 0 && (
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">計算結果サマリー</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">対象者数</p>
-                <p className="text-2xl font-bold text-gray-900">{calculatedData.length}人</p>
+        return (
+        <>
+          {isRefundDetail && calculatedData.length > 0 && (
+            <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">計算結果サマリー</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-600 mb-1">対象者数</p>
+                  <p className="text-2xl font-bold text-gray-900">{calculatedData.length}人</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-600 mb-1">総預り金</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {calculatedData.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-600 mb-1">総支出</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                  <p className="text-xs text-gray-600 mb-1">総還元金</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {calculatedData.reduce((sum, r) => sum + r.当月還元金合計, 0).toLocaleString()}円
+                  </p>
+                </div>
               </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総預り金</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {calculatedData.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総支出</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総還元金</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {calculatedData.reduce((sum, r) => sum + r.当月還元金合計, 0).toLocaleString()}円
-                </p>
+              <div className="mt-4 grid grid-cols-3 md:grid-cols-7 gap-2">
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">家賃合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.家賃, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">日用品合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.日用品, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">修繕積立合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.修繕積立, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">食費合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.食費合計, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">光熱費合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.光熱費, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">管理費合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.金銭管理費, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">食材費合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.食材費, 0).toLocaleString()}円
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded shadow-sm">
+                  <p className="text-xs text-gray-600">共益費合計</p>
+                  <p className="text-sm font-semibold text-gray-900">
+                    {calculatedData.reduce((sum, r) => sum + r.共益費, 0).toLocaleString()}円
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-3 md:grid-cols-7 gap-2">
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">家賃合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.家賃, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">日用品合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.日用品, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">修繕積立合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.修繕積立, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">食費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.食費合計, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">光熱費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.光熱費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">管理費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.金銭管理費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">食材費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.食材費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">共益費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.共益費, 0).toLocaleString()}円
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                {headers.map((header) => (
-                  <th
-                    key={header}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeData.map((row: any, idx: number) => (
-                <tr key={idx} className="hover:bg-gray-50">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
                   {headers.map((header) => (
-                    <td
+                    <th
                       key={header}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap"
                     >
-                      {typeof row[header] === 'number'
-                        ? row[header].toLocaleString('ja-JP')
-                        : row[header] || '-'}
-                    </td>
+                      {header}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </>
-    );
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {activeData.map((row: any, idx: number) => (
+                  <tr key={idx} className="hover:bg-gray-50">
+                    {headers.map((header) => (
+                      <td
+                        key={header}
+                        className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                      >
+                        {typeof row[header] === 'number'
+                          ? row[header].toLocaleString('ja-JP')
+                          : row[header] || '-'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+        );
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <FileSpreadsheet className="w-10 h-10 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">還元金計算ツール</h1>
-          </div>
-          <p className="text-gray-600">
-            Google スプレッドシートから利用者データを読み込み、還元金を自動計算します
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            スプレッドシートID
-          </label>
-          <div className="flex gap-4">
-            <input
-              type="text"
-              value={spreadsheetId}
-              onChange={(e) => setSpreadsheetId(e.target.value)}
-              placeholder="1X2Y3Z..."
-              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
-            />
-            <button
-              onClick={loadAllData}
-              disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <Download className="w-5 h-5" />
-              )}
-              データ読み込み
-            </button>
-          </div>
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              {error}
+        return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-4">
+                <FileSpreadsheet className="w-10 h-10 text-blue-600" />
+                <h1 className="text-3xl font-bold text-gray-900">還元金計算ツール</h1>
+              </div>
+              <p className="text-gray-600">
+                Google スプレッドシートから利用者データを読み込み、還元金を自動計算します
+              </p>
             </div>
-          )}
-          {successMessage && (
-            <div className="mt-4 p-4 bg-green-50 text-green-700 rounded-md">
-              {successMessage}
-            </div>
-          )}
-        </div>
 
-        <div className="mb-4 flex flex-col gap-2">
-          <details className="text-sm text-gray-500 cursor-pointer p-2 border rounded hover:bg-gray-50">
-            <summary>🔍 データインスペクター (最初のレコード)</summary>
-            <div className="mt-2 space-y-4 p-2">
-              {unitManagement.length > 0 && (
-                <div>
-                  <p className="font-bold text-xs uppercase text-gray-700">ユニット管理 (UnitManagement)</p>
-                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(unitManagement[0], null, 2)}
-                  </pre>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                スプレッドシートID
+              </label>
+              <div className="flex gap-4">
+                <input
+                  type="text"
+                  value={spreadsheetId}
+                  onChange={(e) => setSpreadsheetId(e.target.value)}
+                  placeholder="1X2Y3Z..."
+                  className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
+                />
+                <button
+                  onClick={loadAllData}
+                  disabled={loading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loading ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  ) : (
+                    <Download className="w-5 h-5" />
+                  )}
+                  データ読み込み
+                </button>
+              </div>
+              {error && (
+                <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  {error}
                 </div>
               )}
-              {mealCount.length > 0 && (
-                <div>
-                  <p className="font-bold text-xs uppercase text-gray-700">食数データ (MealCount)</p>
-                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(mealCount[0], null, 2)}
-                  </pre>
+              {successMessage && (
+                <div className="mt-4 p-4 bg-green-50 text-green-700 rounded-md">
+                  {successMessage}
                 </div>
               )}
             </div>
-          </details>
-        </div>
 
-        {unitChanges.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              ユニット移動の検出
-            </h3>
-            <div className="space-y-4">
-              {unitChanges.map((change, idx) => (
-                <div key={idx} className="bg-white p-4 rounded border border-yellow-100">
-                  <p className="font-bold text-gray-900">{change.氏名} ({change.利用者ID})</p>
-                  <ul className="mt-2 space-y-1">
-                    {change.変更履歴.map((hist, hIdx) => (
-                      <li key={hIdx} className="text-sm text-gray-600 ml-4 list-disc">
-                        {hist.年月}: {hist.変更前} → <span className="font-bold text-yellow-700">{hist.変更後}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {validationWarnings.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-orange-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              データ不足の警告
-            </h3>
-            <div className="max-h-60 overflow-y-auto space-y-2">
-              {validationWarnings.map((warning, idx) => (
-                <div key={idx} className="flex gap-2 text-sm text-orange-700">
-                  <span className="font-bold min-w-[120px]">
-                    {warning.type === 'missing_month' ? '月データ不足' :
-                      warning.type === 'missing_utility' ? '光熱費未登録' : '食数未登録'}
-                  </span>
-                  <span>{warning.message}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {unitManagement.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors
-                      ${activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-                    `}
-                  >
-                    {tab.label}
-                    {tab.data.length > 0 && (
-                      <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                        {tab.data.length}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            <div className="p-6">
-              {activeTab === 'refundDetail' && (
-                <div className="mb-6 flex gap-4">
-                  <button
-                    onClick={calculateRefunds}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm transition-colors"
-                  >
-                    <Calculator className="w-5 h-5" />
-                    還元金計算を実行
-                  </button>
-                  {refundDetail.length > 0 && (
-                    <button
-                      onClick={writeToSheet}
-                      disabled={loading}
-                      className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      ) : (
-                        <Save className="w-5 h-5" />
-                      )}
-                      スプレッドシートへ書き込み
-                    </button>
+            <div className="mb-4 flex flex-col gap-2">
+              <details className="text-sm text-gray-500 cursor-pointer p-2 border rounded hover:bg-gray-50">
+                <summary>🔍 データインスペクター (最初のレコード)</summary>
+                <div className="mt-2 space-y-4 p-2">
+                  {unitManagement.length > 0 && (
+                    <div>
+                      <p className="font-bold text-xs uppercase text-gray-700">ユニット管理 (UnitManagement)</p>
+                      <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                        {JSON.stringify(unitManagement[0], null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  {mealCount.length > 0 && (
+                    <div>
+                      <p className="font-bold text-xs uppercase text-gray-700">食数データ (MealCount)</p>
+                      <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
+                        {JSON.stringify(mealCount[0], null, 2)}
+                      </pre>
+                    </div>
                   )}
                 </div>
-              )}
-
-              {renderTable()}
+              </details>
             </div>
+
+            {unitChanges.length > 0 && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  ユニット移動の検出
+                </h3>
+                <div className="space-y-4">
+                  {unitChanges.map((change, idx) => (
+                    <div key={idx} className="bg-white p-4 rounded border border-yellow-100">
+                      <p className="font-bold text-gray-900">{change.氏名} ({change.利用者ID})</p>
+                      <ul className="mt-2 space-y-1">
+                        {change.変更履歴.map((hist, hIdx) => (
+                          <li key={hIdx} className="text-sm text-gray-600 ml-4 list-disc">
+                            {hist.年月}: {hist.変更前} → <span className="font-bold text-yellow-700">{hist.変更後}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {validationWarnings.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
+                <h3 className="text-lg font-bold text-orange-800 mb-3 flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5" />
+                  データ不足の警告
+                </h3>
+                <div className="max-h-60 overflow-y-auto space-y-2">
+                  {validationWarnings.map((warning, idx) => (
+                    <div key={idx} className="flex gap-2 text-sm text-orange-700">
+                      <span className="font-bold min-w-[120px]">
+                        {warning.type === 'missing_month' ? '月データ不足' :
+                          warning.type === 'missing_utility' ? '光熱費未登録' : '食数未登録'}
+                      </span>
+                      <span>{warning.message}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {unitManagement.length > 0 && (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
+                <div className="border-b border-gray-200">
+                  <nav className="-mb-px flex overflow-x-auto">
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`
+                      whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors
+                      ${activeTab === tab.id
+                            ? 'border-blue-500 text-blue-600'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
+                    `}
+                      >
+                        {tab.label}
+                        {tab.data.length > 0 && (
+                          <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                            {tab.data.length}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </nav>
+                </div>
+
+                <div className="p-6">
+                  {activeTab === 'refundDetail' && (
+                    <div className="mb-6 flex gap-4">
+                      <button
+                        onClick={calculateRefunds}
+                        className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm transition-colors"
+                      >
+                        <Calculator className="w-5 h-5" />
+                        還元金計算を実行
+                      </button>
+                      {refundDetail.length > 0 && (
+                        <button
+                          onClick={writeToSheet}
+                          disabled={loading}
+                          className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {loading ? (
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          ) : (
+                            <Save className="w-5 h-5" />
+                          )}
+                          スプレッドシートへ書き込み
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {renderTable()}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
-    </div>
-  );
+        </div>
+        );
 }
