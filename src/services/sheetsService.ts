@@ -112,9 +112,11 @@ export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitMa
       昼食費: parseNumber(row[10], '昼食費'),
       夕食費: parseNumber(row[11], '夕食費'),
       行事食: parseNumber(row[12], '行事食'),
-      金銭管理費: parseNumber(row[13], '金銭管理費'),
-      火災保険: parseNumber(row[14], '火災保険'),
-      備考: parseString(row[15]),
+      共益費: parseNumber(row[13], '共益費'),
+      金銭管理費: parseNumber(row[14], '金銭管理費'),
+      火災保険: parseNumber(row[15], '火災保険'),
+      食材費: parseNumber(row[16], '食材費'),
+      備考: parseString(row[17]),
     };
 
     if (index === 0) {
@@ -241,14 +243,16 @@ export async function fetchRefundDetail(spreadsheetId: string): Promise<RefundDe
       月額預り金: parseNumber(row[4], '月額預り金'),
       家賃: parseNumber(row[5], '家賃'),
       家賃補助: parseNumber(row[6], '家賃補助'),
-      日用品: parseNumber(row[7], '日用品'),
-      修繕積立: parseNumber(row[8], '修繕積立'),
-      食費合計: parseNumber(row[9], '食費合計'),
-      光熱費: parseNumber(row[10], '光熱費'),
-      金銭管理費: parseNumber(row[11], '金銭管理費'),
-      火災保険: parseNumber(row[12], '火災保険'),
-      繰越金: parseNumber(row[13], '繰越金'),
-      当月還元金合計: parseNumber(row[14], '当月還元金合計'),
+      共益費: parseNumber(row[7], '共益費'),
+      日用品: parseNumber(row[8], '日用品'),
+      修繕積立: parseNumber(row[9], '修繕積立'),
+      食費合計: parseNumber(row[10], '食費合計'),
+      光熱費: parseNumber(row[11], '光熱費'),
+      金銭管理費: parseNumber(row[12], '金銭管理費'),
+      火災保険: parseNumber(row[13], '火災保険'),
+      食材費: parseNumber(row[14], '食材費'),
+      繰越金: parseNumber(row[15], '繰越金'),
+      当月還元金合計: parseNumber(row[16], '当月還元金合計'),
     };
 
     if (index === 0) {
@@ -278,12 +282,14 @@ export async function writeRefundDetail(
     refund.月額預り金,
     refund.家賃,
     refund.家賃補助,
+    refund.共益費,
     refund.日用品,
     refund.修繕積立,
     refund.食費合計,
     refund.光熱費,
     refund.金銭管理費,
     refund.火災保険,
+    refund.食材費,
     refund.繰越金,
     refund.当月還元金合計,
   ]);
@@ -417,8 +423,10 @@ export async function writeUnitManagement(
     item.昼食費,
     item.夕食費,
     item.行事食,
+    item.共益費,
     item.金銭管理費,
     item.火災保険,
+    item.食材費,
     item.備考,
   ]);
 

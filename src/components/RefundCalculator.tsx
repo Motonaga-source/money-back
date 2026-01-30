@@ -227,8 +227,8 @@ export default function RefundCalculator() {
       const summary = userMap[refund.利用者ID];
       summary.年間預り金合計 += refund.月額預り金;
       // 実質的な支出 = 家賃(満額) + 家賃補助(マイナス) + その他
-      summary.年間支出合計 += refund.家賃 + refund.家賃補助 + refund.日用品 + refund.修繕積立 +
-        refund.食費合計 + refund.光熱費 + refund.金銭管理費 + refund.火災保険;
+      summary.年間支出合計 += refund.家賃 + refund.家賃補助 + refund.共益費 + refund.日用品 + refund.修繕積立 +
+        refund.食費合計 + refund.光熱費 + refund.金銭管理費 + refund.火災保険 + refund.食材費;
       summary.年間還元金合計 += refund.当月還元金合計;
       summary.月別データ.push(refund);
     });
@@ -401,8 +401,10 @@ export default function RefundCalculator() {
 
       const 金銭管理費 = um.金銭管理費 || 0;
       const 火災保険 = um.火災保険 || 0;
+      const 共益費 = um.共益費 || 0;
+      const 食材費 = um.食材費 || 0;
 
-      const 当月還元金合計 = 月額預り金 - 実質家賃 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険;
+      const 当月還元金合計 = 月額預り金 - 実質家賃 - 共益費 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険 - 食材費;
 
       if (index === 0) {
         console.log(`📊 計算例 (${um.氏名}):`, {
@@ -429,6 +431,7 @@ export default function RefundCalculator() {
         月額預り金: Math.round(月額預り金),
         家賃: Math.round(ユニット家賃), // Store original unit rent (満額)
         家賃補助: Math.round(家賃補助),
+        共益費: Math.round(共益費),
         日用品: Math.round(日用品),
         修繕積立: Math.round(修繕積立),
         食費合計: Math.round(食費合計),
@@ -438,6 +441,7 @@ export default function RefundCalculator() {
         光熱費: Math.round(光熱費),
         金銭管理費: Math.round(金銭管理費),
         火災保険: Math.round(火災保険),
+        食材費: Math.round(食材費),
         繰越金: 0,
         当月還元金合計: Math.round(当月還元金合計),
         calculated: true,
@@ -457,7 +461,7 @@ export default function RefundCalculator() {
     console.log(`✅ 計算完了: ${calculated.length}件 (成功: ${successCount}, 警告: ${warningCount})`);
     console.log('計算結果サマリー:', {
       総預り金: calculated.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString() + '円',
-      総支出: calculated.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString() + '円',
+      総支出: calculated.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString() + '円',
       総還元金: totalRefund.toLocaleString() + '円',
     });
 
@@ -709,8 +713,10 @@ export default function RefundCalculator() {
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">昼食単価</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">夕食単価</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">行事単価</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">共益費</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">金銭管理</th>
                 <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">火災保険</th>
+                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">食材費</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">備考</th>
               </tr>
             </thead>
@@ -800,6 +806,14 @@ export default function RefundCalculator() {
                     <td className="px-1 py-4 whitespace-nowrap text-center">
                       <input
                         type="number"
+                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={unitData.共益費}
+                        onChange={(e) => handleUnitInputChange(user.利用者ID, '共益費', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-1 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
                         className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
                         value={unitData.金銭管理費}
                         onChange={(e) => handleUnitInputChange(user.利用者ID, '金銭管理費', Number(e.target.value))}
@@ -811,6 +825,14 @@ export default function RefundCalculator() {
                         className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
                         value={unitData.火災保険}
                         onChange={(e) => handleUnitInputChange(user.利用者ID, '火災保険', Number(e.target.value))}
+                      />
+                    </td>
+                    <td className="px-1 py-4 whitespace-nowrap text-center">
+                      <input
+                        type="number"
+                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
+                        value={unitData.食材費}
+                        onChange={(e) => handleUnitInputChange(user.利用者ID, '食材費', Number(e.target.value))}
                       />
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -1159,8 +1181,10 @@ export default function RefundCalculator() {
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">夕食費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">修繕積立金</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">日用品費</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">共益費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">金銭管理費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">火災保険</th>
+                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">食材費</th>
                             <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">還元金</th>
                           </tr>
                         </thead>
@@ -1216,10 +1240,16 @@ export default function RefundCalculator() {
                                   {r.日用品.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
+                                  {r.共益費.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-2 text-right text-gray-900">
                                   {r.金銭管理費.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right text-gray-900">
                                   {r.火災保険.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-2 text-right text-gray-900">
+                                  {r.食材費.toLocaleString()}
                                 </td>
                                 <td className="px-4 py-2 text-right font-semibold text-green-600">
                                   {r.当月還元金合計.toLocaleString()}
@@ -1283,7 +1313,7 @@ export default function RefundCalculator() {
               <div className="bg-white p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-600 mb-1">総支出</p>
                 <p className="text-2xl font-bold text-orange-600">
-                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険), 0).toLocaleString()}円
+                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString()}円
                 </p>
               </div>
               <div className="bg-white p-4 rounded-lg shadow-sm">
@@ -1331,9 +1361,15 @@ export default function RefundCalculator() {
                 </p>
               </div>
               <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">保険合計</p>
+                <p className="text-xs text-gray-600">食材費合計</p>
                 <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.火災保険, 0).toLocaleString()}円
+                  {calculatedData.reduce((sum, r) => sum + r.食材費, 0).toLocaleString()}円
+                </p>
+              </div>
+              <div className="bg-white p-3 rounded shadow-sm">
+                <p className="text-xs text-gray-600">共益費合計</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {calculatedData.reduce((sum, r) => sum + r.共益費, 0).toLocaleString()}円
                 </p>
               </div>
             </div>

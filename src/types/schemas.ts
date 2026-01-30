@@ -12,8 +12,10 @@ export interface UnitManagement {
   昼食費: number;
   夕食費: number;
   行事食: number;
+  共益費: number;
   金銭管理費: number;
   火災保険: number;
+  食材費: number;
   備考: string;
 }
 
@@ -53,12 +55,14 @@ export interface RefundDetail {
   月額預り金: number;
   家賃: number;
   家賃補助: number;
+  共益費: number;
   日用品: number;
   修繕積立: number;
   食費合計: number;
   光熱費: number;
   金銭管理費: number;
   火災保険: number;
+  食材費: number;
   繰越金: number;
   当月還元金合計: number;
 }
@@ -69,9 +73,9 @@ export interface SheetConfig {
 }
 
 export const SHEET_CONFIGS: Record<string, SheetConfig> = {
-  unitManagement: { name: 'ユニット管理', range: 'A:P' },
+  unitManagement: { name: 'ユニット管理', range: 'A:R' },
   unitMaster: { name: 'ユニットマスタ', range: 'A:C' },
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },
-  refundDetail: { name: '還元金明細', range: 'A:O' },
+  refundDetail: { name: '還元金明細', range: 'A:Q' },
 };
