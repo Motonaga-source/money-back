@@ -196,15 +196,15 @@ export default function RefundCalculator() {
     const [yearA, monthA] = a.split('-').map(Number);
     const [yearB, monthB] = b.split('-').map(Number);
 
-    const fiscalYearA = monthA >= 4 ? yearA : yearA - 1;
-    const fiscalYearB = monthB >= 4 ? yearB : yearB - 1;
+    const fiscalYearA = monthA >= 3 ? yearA : yearA - 1;
+    const fiscalYearB = monthB >= 3 ? yearB : yearB - 1;
 
     if (fiscalYearA !== fiscalYearB) {
       return fiscalYearA - fiscalYearB;
     }
 
-    const fiscalMonthA = monthA >= 4 ? monthA - 4 : monthA + 8;
-    const fiscalMonthB = monthB >= 4 ? monthB - 4 : monthB + 8;
+    const fiscalMonthA = monthA >= 3 ? monthA - 3 : monthA + 9;
+    const fiscalMonthB = monthB >= 3 ? monthB - 3 : monthB + 9;
 
     return fiscalMonthA - fiscalMonthB;
   };
@@ -663,7 +663,7 @@ export default function RefundCalculator() {
       );
     }
 
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
+    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear);
     const activeUsers = unitManagement
       .filter(u => u.年月 === unitInputMonth)
       .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
@@ -960,7 +960,7 @@ export default function RefundCalculator() {
       );
     }
 
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
+    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear);
 
     // Filter users belonging to the selected month in UnitManagement
     // This ensures we only show active users for that month
