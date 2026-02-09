@@ -16,6 +16,7 @@ export interface UnitManagement {
   金銭管理費: number;
   火災保険: number;
   食材費: number;
+  ステータス: string;
   備考: string;
 }
 
@@ -73,7 +74,7 @@ export interface SheetConfig {
 }
 
 export const SHEET_CONFIGS: Record<string, SheetConfig> = {
-  unitManagement: { name: 'ユニット管理', range: 'A:R' },
+  unitManagement: { name: 'ユニット管理', range: 'A:S' },
   unitMaster: { name: 'ユニットマスタ', range: 'A:C' },
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },

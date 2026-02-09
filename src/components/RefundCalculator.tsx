@@ -137,6 +137,8 @@ export default function RefundCalculator() {
       userMonths[record.利用者ID].add(record.年月);
     });
 
+    // 中途入居等は正常な運用の範囲内のため、12ヶ月分のデータ不足警告は非表示にする
+    /*
     Object.entries(userMonths).forEach(([利用者ID, months]) => {
       if (months.size < 12) {
         const user = unitMgmt.find((u) => u.利用者ID === 利用者ID);
@@ -148,6 +150,7 @@ export default function RefundCalculator() {
         });
       }
     });
+    */
 
     const utilityMap = new Map<string, Set<string>>();
     utilityCost.forEach((u) => {
@@ -192,19 +195,23 @@ export default function RefundCalculator() {
     return warnings;
   };
 
-  const sortByFiscalYear = (a: string, b: string): number => {
-    const [yearA, monthA] = a.split('-').map(Number);
-    const [yearB, monthB] = b.split('-').map(Number);
+  const sortByFiscalYear = (a: any, b: any): number => {
+    const valA = String(a || '');
+    const valB = String(b || '');
+    if (!valA || !valB) return 0;
 
-    const fiscalYearA = monthA >= 3 ? yearA : yearA - 1;
-    const fiscalYearB = monthB >= 3 ? yearB : yearB - 1;
+    const [yearA, monthA] = valA.split('-').map(Number);
+    const [yearB, monthB] = valB.split('-').map(Number);
+
+    const fiscalYearA = monthA >= 4 ? yearA : yearA - 1;
+    const fiscalYearB = monthB >= 4 ? yearB : yearB - 1;
 
     if (fiscalYearA !== fiscalYearB) {
       return fiscalYearA - fiscalYearB;
     }
 
-    const fiscalMonthA = monthA >= 3 ? monthA - 3 : monthA + 9;
-    const fiscalMonthB = monthB >= 3 ? monthB - 3 : monthB + 9;
+    const fiscalMonthA = monthA >= 4 ? monthA - 4 : monthA + 8;
+    const fiscalMonthB = monthB >= 4 ? monthB - 4 : monthB + 8;
 
     return fiscalMonthA - fiscalMonthB;
   };
@@ -309,11 +316,13 @@ export default function RefundCalculator() {
     let successCount = 0;
     let warningCount = 0;
 
-    // ユニットごとの人数を月別に計算
+    // ユニットごとの人数を月別に計算（「退去中」を除外）
     const unitMemberCount: Record<string, number> = {};
-    unitManagement.forEach(um => {
-      const key = `${um.年月}_${um.所属ユニット}`;
-      unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
+    unitManagement.forEach((um: UnitManagement) => {
+      if (um.ステータス !== '退去中') {
+        const key = `${um.年月}_${um.所属ユニット}`;
+        unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
+      }
     });
 
     const calculated: CalculatedRefund[] = unitManagement.map((um: UnitManagement, index: number) => {
@@ -546,7 +555,7 @@ export default function RefundCalculator() {
   // Initialize months when data loads or tab changes
   useEffect(() => {
     if ((activeTab === 'mealInput' || activeTab === 'unitInput') && unitManagement.length > 0) {
-      const months = Array.from(new Set(unitManagement.map(u => u.年月))).sort();
+      const months = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
       if (months.length > 0) {
         const latestMonth = months[months.length - 1];
         if (activeTab === 'mealInput' && !mealInputMonth) {
@@ -576,6 +585,9 @@ export default function RefundCalculator() {
         行事食: 0,
         金銭管理費: 0,
         火災保険: 0,
+        共益費: 0,
+        食材費: 0,
+        ステータス: '',
         備考: '',
       };
 
@@ -663,7 +675,7 @@ export default function RefundCalculator() {
       );
     }
 
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear);
+    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
     const activeUsers = unitManagement
       .filter(u => u.年月 === unitInputMonth)
       .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
@@ -960,7 +972,7 @@ export default function RefundCalculator() {
       );
     }
 
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear);
+    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
 
     // Filter users belonging to the selected month in UnitManagement
     // This ensures we only show active users for that month
