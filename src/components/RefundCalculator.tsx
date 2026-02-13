@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { FileSpreadsheet, Calculator, Download, Save, AlertTriangle, ChevronDown, ChevronUp, Users } from 'lucide-react';
+import { FileSpreadsheet, Calculator, Download, Save, AlertTriangle, ChevronDown, ChevronUp, Users, Printer } from 'lucide-react';
 import {
   UnitManagement,
   UnitMaster,
@@ -79,6 +78,9 @@ export default function RefundCalculator() {
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   const [userSummaries, setUserSummaries] = useState<UserSummary[]>([]);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+  const [printingUser, setPrintingUser] = useState<UserSummary | null>(null);
+
+  const normalizeStatus = (s: string) => (s || '').trim().replace(/[\s\u3000]/g, '');
 
   const detectUnitChanges = (data: UnitManagement[]): UnitChange[] => {
     const userUnitHistory: Record<string, { 年月: string; 所属ユニット: string; 氏名: string }[]> = {};
@@ -319,7 +321,8 @@ export default function RefundCalculator() {
     // ユニットごとの人数を月別に計算（「退去中」を除外）
     const unitMemberCount: Record<string, number> = {};
     unitManagement.forEach((um: UnitManagement) => {
-      if (um.ステータス !== '退去中') {
+      const is退去中 = normalizeStatus(um.ステータス) === '退去中';
+      if (!is退去中) {
         const key = `${um.年月}_${um.所属ユニット}`;
         unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
       }
@@ -394,12 +397,14 @@ export default function RefundCalculator() {
 
       const 光熱費総額 = utility?.合計 || 0;
       const 按分率 = unit?.光熱費按分率 || 0;
-      const is退去中 = um.ステータス === '退去中';
+      const normalizedStatus = normalizeStatus(um.ステータス);
+      const is退去中 = normalizedStatus === '退去中';
       const 光熱費 = is退去中 ? 0 : (光熱費総額 * (按分率 / 100)) / ユニット人数;
 
       if (index < 3 || 光熱費 === 0) {
         console.log(`💡 [${index + 1}] ${um.氏名} - 光熱費計算:`, {
           ステータス: um.ステータス || '通常',
+          正規化ステータス: normalizedStatus,
           光熱費総額: `${光熱費総額.toLocaleString()}円`,
           按分率: `${按分率}%`,
           ユニット人数: `${ユニット人数}人 (退去中除く)`,
@@ -1102,6 +1107,14 @@ export default function RefundCalculator() {
     setExpandedUsers(newExpanded);
   };
 
+  const handlePrint = (summary: UserSummary) => {
+    setPrintingUser(summary);
+    // Wait for the state to be applied before printing
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   const tabs = [
     { id: 'mealInput', label: '食数入力', data: [] },
     { id: 'unitInput', label: 'ユニット入力', data: [] },
@@ -1152,6 +1165,16 @@ export default function RefundCalculator() {
                     </div>
                   </div>
                   <div className="flex items-center gap-6">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrint(summary);
+                      }}
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                      title="印刷"
+                    >
+                      <Printer className="w-5 h-5" />
+                    </button>
                     <div className="text-right">
                       <p className="text-xs text-gray-600">年間預り金</p>
                       <p className="text-sm font-bold text-blue-600">
@@ -1603,6 +1626,83 @@ export default function RefundCalculator() {
           </div>
         )}
       </div>
+
+      {/* 印刷用レイアウト (非表示、印刷時のみ表示) */}
+      {printingUser && (
+        <div className="print-only print-content">
+          <h1 className="print-title">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
+          <div className="mb-6 text-sm flex justify-between">
+            <p>利用者ID: {printingUser.利用者ID}</p>
+            <p>印刷日: {new Date().toLocaleDateString('ja-JP')}</p>
+          </div>
+
+          <table className="w-full text-[10px] border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border p-1">年月</th>
+                <th className="border p-1">預り金</th>
+                <th className="border p-1">家賃</th>
+                <th className="border p-1">共益費</th>
+                <th className="border p-1">光熱費</th>
+                <th className="border p-1">食費合計</th>
+                <th className="border p-1">日用品</th>
+                <th className="border p-1">修繕積立</th>
+                <th className="border p-1">管理費</th>
+                <th className="border p-1">保険料</th>
+                <th className="border p-1">食材費</th>
+                <th className="border p-1">還元金</th>
+              </tr>
+            </thead>
+            <tbody>
+              {printingUser.月別データ.map((r, idx) => (
+                <tr key={idx}>
+                  <td className="border p-1 text-center">{r.年月}</td>
+                  <td className="border p-1 text-right">{r.月額預り金.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.家賃.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.共益費.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.光熱費.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.食費合計.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.日用品.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.修繕積立.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.金銭管理費.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.火災保険.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.食材費.toLocaleString()}</td>
+                  <td className="border p-1 text-right font-bold">{r.当月還元金合計.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-gray-50 font-bold">
+                <td className="border p-1 text-center">合計</td>
+                <td className="border p-1 text-right">{printingUser.年間預り金合計.toLocaleString()}</td>
+                <td className="border p-1 text-right colspan-10">
+                  {/* Summary spans across other columns visually in paper if needed, but for simplicity: */}
+                </td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right"></td>
+                <td className="border p-1 text-right">{printingUser.年間還元金合計.toLocaleString()}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div className="mt-8 flex justify-end gap-12 text-sm">
+            <div className="text-right">
+              <p>年間預り金合計: {printingUser.年間預り金合計.toLocaleString()} 円</p>
+              <p>年間支出合計: {printingUser.年間支出合計.toLocaleString()} 円</p>
+              <p className="text-lg font-bold border-t-2 border-black mt-2 pt-1 text-green-700">
+                年間還元金合計: {printingUser.年間還元金合計.toLocaleString()} 円
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
