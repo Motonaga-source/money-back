@@ -280,8 +280,8 @@ export async function fetchCarryoverBalances(spreadsheetId: string): Promise<Car
     const parsed = {
       利用者ID: parseString(row[0]),
       氏名: parseString(row[1]),
-      前年度繰越金: parseNumber(row[2], '前年度繰越金'),
-      繰越金: parseNumber(row[3], '繰越金'),
+      前年度繰越金: parseNumber(row[3], '前年度繰越金'),
+      繰越金: parseNumber(row[4], '繰越金'),
     };
 
     if (index === 0) {

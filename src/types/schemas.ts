@@ -86,5 +86,5 @@ export const SHEET_CONFIGS: Record<string, SheetConfig> = {
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },
   refundDetail: { name: '還元金明細', range: 'A:Q' },
-  carryoverBalance: { name: '繰越金', range: 'A:D' },
+  carryoverBalance: { name: '繰越金', range: 'A:E' },
 };
