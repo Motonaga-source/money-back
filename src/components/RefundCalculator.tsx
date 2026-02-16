@@ -235,13 +235,26 @@ export default function RefundCalculator() {
 
     refunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
-        // 繰越金データを検索
-        const carryover = carryoverBalances.find(c => c.利用者ID === refund.利用者ID);
+        // 繰越金データを検索 (IDの空白除去などで正規化して比較)
+        const targetId = String(refund.利用者ID).trim();
+        const carryover = carryoverBalances.find(c => String(c.利用者ID).trim() === targetId);
 
         if (carryover) {
-          console.log(`✅ Found carryover for ${refund.利用者ID}:`, carryover);
+          console.log(`✅ Found carryover for ${refund.利用者ID} (${refund.氏名}):`, carryover);
         } else {
-          console.log(`⚠️ No carryover found for ${refund.利用者ID}`);
+          // デバッグ: IDが一致しないが名前が一致する場合や、近いIDがあるか確認
+          const nameMatch = carryoverBalances.find(c => c.氏名 === refund.氏名);
+          if (nameMatch) {
+            console.warn(`⚠️ Name matched but ID mismatch for ${refund.氏名}: Refund ID="${refund.利用者ID}" vs Carryover ID="${nameMatch.利用者ID}"`);
+            console.log('Type comparison:', {
+              refundIdType: typeof refund.利用者ID,
+              carryoverIdType: typeof nameMatch.利用者ID,
+              refundIdVal: `"${refund.利用者ID}"`,
+              carryoverIdVal: `"${nameMatch.利用者ID}"`
+            });
+          } else {
+            console.log(`⚠️ No carryover found for ${refund.利用者ID} (${refund.氏名})`);
+          }
         }
 
         userMap[refund.利用者ID] = {
@@ -282,6 +295,12 @@ export default function RefundCalculator() {
         refunds: refundDetail.length,
         carryover: carryoverBalances.length
       });
+      if (refundDetail.length > 0) {
+        console.log('Refund Sample ID:', `"${refundDetail[0].利用者ID}"`, typeof refundDetail[0].利用者ID);
+      }
+      if (carryoverBalances.length > 0) {
+        console.log('Carryover Sample ID:', `"${carryoverBalances[0].利用者ID}"`, typeof carryoverBalances[0].利用者ID);
+      }
       const summaries = generateUserSummaries(refundDetail);
       setUserSummaries(summaries);
     }
