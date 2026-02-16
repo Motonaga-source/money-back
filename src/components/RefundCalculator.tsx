@@ -323,7 +323,7 @@ export default function RefundCalculator() {
     const unitMemberCount: Record<string, number> = {};
     unitManagement.forEach((um: UnitManagement) => {
       const normalizedStatus = normalizeStatus(um.ステータス);
-      const is退去中 = normalizedStatus.includes('退去中');
+      const is退去中 = normalizedStatus.includes('退去');
       if (!is退去中) {
         const key = `${um.年月}_${um.所属ユニット}`;
         unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
@@ -400,7 +400,7 @@ export default function RefundCalculator() {
       const 光熱費総額 = utility?.合計 || 0;
       const 按分率 = unit?.光熱費按分率 || 0;
       const normalizedStatus = normalizeStatus(um.ステータス);
-      const is退去中 = normalizedStatus.includes('退去中');
+      const is退去中 = normalizedStatus.includes('退去');
       const 光熱費 = is退去中 ? 0 : (光熱費総額 * (按分率 / 100)) / ユニット人数;
 
       // Debug specific users or status

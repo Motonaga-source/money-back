@@ -116,8 +116,8 @@ export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitMa
       金銭管理費: parseNumber(row[14], '金銭管理費'),
       火災保険: parseNumber(row[15], '火災保険'),
       食材費: parseNumber(row[16], '食材費'),
-      ステータス: parseString(row[17]),
-      備考: parseString(row[18]),
+      ステータス: parseString(row[18]), // S列
+      備考: parseString(row[17]),     // R列
     };
 
     if (index === 0) {
@@ -428,8 +428,8 @@ export async function writeUnitManagement(
     item.金銭管理費,
     item.火災保険,
     item.食材費,
-    item.ステータス,
-    item.備考,
+    item.備考,       // R列
+    item.ステータス, // S列
   ]);
 
   try {
