@@ -237,7 +237,15 @@ export default function RefundCalculator() {
       if (!userMap[refund.利用者ID]) {
         // 繰越金データを検索 (IDの空白除去などで正規化して比較)
         const targetId = String(refund.利用者ID).trim();
-        const carryover = carryoverBalances.find(c => String(c.利用者ID).trim() === targetId);
+        let carryover = carryoverBalances.find(c => String(c.利用者ID).trim() === targetId);
+
+        if (!carryover) {
+          const nameMatch = carryoverBalances.find(c => c.氏名 === refund.氏名);
+          if (nameMatch) {
+            console.warn(`⚠️ Using name fallback for ${refund.氏名}: from ID="${refund.利用者ID}" to "${nameMatch.利用者ID}"`);
+            carryover = nameMatch;
+          }
+        }
 
         if (carryover) {
           console.log(`✅ Found carryover for ${refund.利用者ID} (${refund.氏名}):`, carryover);
