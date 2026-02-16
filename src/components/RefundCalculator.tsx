@@ -322,7 +322,8 @@ export default function RefundCalculator() {
     // ユニットごとの人数を月別に計算（「退去中」を除外）
     const unitMemberCount: Record<string, number> = {};
     unitManagement.forEach((um: UnitManagement) => {
-      const is退去中 = normalizeStatus(um.ステータス) === '退去中';
+      const normalizedStatus = normalizeStatus(um.ステータス);
+      const is退去中 = normalizedStatus.includes('退去中');
       if (!is退去中) {
         const key = `${um.年月}_${um.所属ユニット}`;
         unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
@@ -399,8 +400,19 @@ export default function RefundCalculator() {
       const 光熱費総額 = utility?.合計 || 0;
       const 按分率 = unit?.光熱費按分率 || 0;
       const normalizedStatus = normalizeStatus(um.ステータス);
-      const is退去中 = normalizedStatus === '退去中';
+      const is退去中 = normalizedStatus.includes('退去中');
       const 光熱費 = is退去中 ? 0 : (光熱費総額 * (按分率 / 100)) / ユニット人数;
+
+      // Debug specific users or status
+      if (normalizedStatus.includes('退去') || um.氏名.includes('島田') || um.氏名.includes('橋野')) {
+        console.log(`🔍 [Status Check] ${um.氏名} (${um.年月}):`, {
+          raw: um.ステータス,
+          normalized: normalizedStatus,
+          is退去中: is退去中,
+          cost: is退去中 ? 0 : 光熱費,
+          unit_count: ユニット人数
+        });
+      }
 
       if (index < 3 || 光熱費 === 0) {
         console.log(`💡 [${index + 1}] ${um.氏名} - 光熱費計算:`, {
