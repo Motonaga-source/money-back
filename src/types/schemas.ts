@@ -68,6 +68,13 @@ export interface RefundDetail {
   当月還元金合計: number;
 }
 
+export interface CarryoverBalance {
+  利用者ID: string;
+  氏名: string;
+  前年度繰越金: number;
+  繰越金: number;
+}
+
 export interface SheetConfig {
   name: string;
   range: string;
@@ -79,4 +86,5 @@ export const SHEET_CONFIGS: Record<string, SheetConfig> = {
   unitUtilityCost: { name: 'ユニット別光熱費', range: 'A:G' },
   mealCount: { name: '食数計算', range: 'A:I' },
   refundDetail: { name: '還元金明細', range: 'A:Q' },
+  carryoverBalance: { name: '繰越金', range: 'A:D' },
 };

@@ -6,6 +6,7 @@ import {
   UnitUtilityCost,
   MealCount,
   RefundDetail,
+  CarryoverBalance,
 } from '../types/schemas';
 import {
   fetchUnitManagement,
@@ -13,6 +14,7 @@ import {
   fetchUnitUtilityCost,
   fetchMealCount,
   fetchRefundDetail,
+  fetchCarryoverBalances,
   writeRefundDetail,
   writeMealCount,
   writeUnitManagement,
@@ -60,6 +62,9 @@ interface UserSummary {
   年間預り金合計: number;
   年間支出合計: number;
   年間還元金合計: number;
+  前年度繰越金: number;
+  繰越金: number;
+  最終還元金: number;
   月別データ: RefundDetail[];
 }
 
@@ -75,6 +80,7 @@ export default function RefundCalculator() {
   const [unitUtilityCost, setUnitUtilityCost] = useState<UnitUtilityCost[]>([]);
   const [mealCount, setMealCount] = useState<MealCount[]>([]);
   const [refundDetail, setRefundDetail] = useState<CalculatedRefund[]>([]);
+  const [carryoverBalances, setCarryoverBalances] = useState<CarryoverBalance[]>([]);
   const [unitChanges, setUnitChanges] = useState<UnitChange[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   const [userSummaries, setUserSummaries] = useState<UserSummary[]>([]);
@@ -224,12 +230,18 @@ export default function RefundCalculator() {
 
     refunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
+        // 繰越金データを検索
+        const carryover = carryoverBalances.find(c => c.利用者ID === refund.利用者ID);
+
         userMap[refund.利用者ID] = {
           利用者ID: refund.利用者ID,
           氏名: refund.氏名,
           年間預り金合計: 0,
           年間支出合計: 0,
           年間還元金合計: 0,
+          前年度繰越金: carryover?.前年度繰越金 || 0,
+          繰越金: carryover?.繰越金 || 0,
+          最終還元金: 0,
           月別データ: [],
         };
       }
@@ -243,8 +255,10 @@ export default function RefundCalculator() {
       summary.月別データ.push(refund);
     });
 
+    // 最終還元金を計算: 年間還元金 + 前年度繰越金 - 繰越金
     Object.values(userMap).forEach((summary) => {
       summary.月別データ.sort((a, b) => sortByFiscalYear(a.年月, b.年月));
+      summary.最終還元金 = summary.年間還元金合計 + summary.前年度繰越金 - summary.繰越金;
     });
 
     return Object.values(userMap).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
@@ -269,12 +283,14 @@ export default function RefundCalculator() {
         unitUtilityCostData,
         mealCountData,
         refundDetailData,
+        carryoverBalanceData,
       ] = await Promise.all([
         fetchUnitManagement(spreadsheetId),
         fetchUnitMaster(spreadsheetId),
         fetchUnitUtilityCost(spreadsheetId),
         fetchMealCount(spreadsheetId),
         fetchRefundDetail(spreadsheetId),
+        fetchCarryoverBalances(spreadsheetId),
       ]);
 
       console.log('Data loaded successfully:', {
@@ -283,12 +299,14 @@ export default function RefundCalculator() {
         unitUtilityCost: unitUtilityCostData.length,
         mealCount: mealCountData.length,
         refundDetail: refundDetailData.length,
+        carryoverBalance: carryoverBalanceData.length,
       });
 
       setUnitManagement(unitManagementData);
       setUnitMaster(unitMasterData);
       setUnitUtilityCost(unitUtilityCostData);
       setMealCount(mealCountData);
+      setCarryoverBalances(carryoverBalanceData);
       // 型キャストして初期化
       setRefundDetail(refundDetailData.map((r: RefundDetail) => ({
         ...r,
@@ -731,7 +749,7 @@ export default function RefundCalculator() {
           </button>
         </div>
 
-        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-auto">
+        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-x-auto overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
@@ -1031,7 +1049,7 @@ export default function RefundCalculator() {
           </button>
         </div>
 
-        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-auto">
+        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-x-auto overflow-y-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>

@@ -4,6 +4,7 @@ import {
   UnitUtilityCost,
   MealCount,
   RefundDetail,
+  CarryoverBalance,
   SHEET_CONFIGS,
 } from '../types/schemas';
 
@@ -264,6 +265,33 @@ export async function fetchRefundDetail(spreadsheetId: string): Promise<RefundDe
   });
 
   console.log('Parsed RefundDetail data:', data.length, 'records');
+  return data;
+}
+
+export async function fetchCarryoverBalances(spreadsheetId: string): Promise<CarryoverBalance[]> {
+  const config = SHEET_CONFIGS.carryoverBalance;
+  const rows = await fetchSheetData(spreadsheetId, config.name, config.range);
+
+  if (rows.length <= 1) return [];
+
+  console.log('Raw CarryoverBalance rows (first 2):', rows.slice(0, 2));
+
+  const data = rows.slice(1).map((row, index) => {
+    const parsed = {
+      利用者ID: parseString(row[0]),
+      氏名: parseString(row[1]),
+      前年度繰越金: parseNumber(row[2], '前年度繰越金'),
+      繰越金: parseNumber(row[3], '繰越金'),
+    };
+
+    if (index === 0) {
+      console.log('First carryover balance parsed:', parsed);
+    }
+
+    return parsed;
+  });
+
+  console.log('Parsed CarryoverBalance data:', data.length, 'records');
   return data;
 }
 
