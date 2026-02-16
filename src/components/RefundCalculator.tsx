@@ -228,10 +228,21 @@ export default function RefundCalculator() {
   const generateUserSummaries = (refunds: CalculatedRefund[]): UserSummary[] => {
     const userMap: Record<string, UserSummary> = {};
 
+    console.log('🔍 Carryover balances available:', carryoverBalances.length);
+    if (carryoverBalances.length > 0) {
+      console.log('First carryover balance:', carryoverBalances[0]);
+    }
+
     refunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
         // 繰越金データを検索
         const carryover = carryoverBalances.find(c => c.利用者ID === refund.利用者ID);
+
+        if (carryover) {
+          console.log(`✅ Found carryover for ${refund.利用者ID}:`, carryover);
+        } else {
+          console.log(`⚠️ No carryover found for ${refund.利用者ID}`);
+        }
 
         userMap[refund.利用者ID] = {
           利用者ID: refund.利用者ID,
@@ -263,6 +274,18 @@ export default function RefundCalculator() {
 
     return Object.values(userMap).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
   };
+
+  // Recalculate user summaries whenever refund detail or carryover balances change
+  useEffect(() => {
+    if (refundDetail.length > 0) {
+      console.log('🔄 Updating user summaries due to data change', {
+        refunds: refundDetail.length,
+        carryover: carryoverBalances.length
+      });
+      const summaries = generateUserSummaries(refundDetail);
+      setUserSummaries(summaries);
+    }
+  }, [refundDetail, carryoverBalances]);
 
   const loadAllData = async () => {
     if (!spreadsheetId.trim()) {
@@ -514,9 +537,12 @@ export default function RefundCalculator() {
 
     setRefundDetail(calculated);
 
-    const summaries = generateUserSummaries(calculated);
-    setUserSummaries(summaries);
-    console.log('📊 利用者別サマリー生成:', summaries.length, '名');
+    setRefundDetail(calculated);
+
+    // Summaries will be updated automatically by useEffect when refundDetail changes
+    // const summaries = generateUserSummaries(calculated);
+    // setUserSummaries(summaries);
+    console.log('📊 利用者別サマリー生成トリガー: データ更新待ち');
 
     // Auto-switch to refundDetail only if we were in unitManagement or unitUtilityCost
     // If we are in mealInput, we might want to stay there
