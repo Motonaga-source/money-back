@@ -1220,8 +1220,26 @@ export default function RefundCalculator() {
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-600">年間還元金</p>
-                      <p className="text-lg font-bold text-green-600">
+                      <p className="text-sm font-bold text-gray-700">
                         {summary.年間還元金合計.toLocaleString()}円
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-600">前年度繰越金</p>
+                      <p className="text-sm font-bold text-purple-600">
+                        {summary.前年度繰越金.toLocaleString()}円
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-600">繰越金</p>
+                      <p className="text-sm font-bold text-red-600">
+                        -{summary.繰越金.toLocaleString()}円
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-gray-600">最終還元金</p>
+                      <p className="text-lg font-bold text-green-600">
+                        {summary.最終還元金.toLocaleString()}円
                       </p>
                     </div>
                     {isExpanded ? (
@@ -1555,48 +1573,6 @@ export default function RefundCalculator() {
           </details>
         </div>
 
-        {unitChanges.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              ユニット移動の検出
-            </h3>
-            <div className="space-y-4">
-              {unitChanges.map((change, idx) => (
-                <div key={idx} className="bg-white p-4 rounded border border-yellow-100">
-                  <p className="font-bold text-gray-900">{change.氏名} ({change.利用者ID})</p>
-                  <ul className="mt-2 space-y-1">
-                    {change.変更履歴.map((hist, hIdx) => (
-                      <li key={hIdx} className="text-sm text-gray-600 ml-4 list-disc">
-                        {hist.年月}: {hist.変更前} → <span className="font-bold text-yellow-700">{hist.変更後}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {validationWarnings.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-orange-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              データ不足の警告
-            </h3>
-            <div className="max-h-60 overflow-y-auto space-y-2">
-              {validationWarnings.map((warning, idx) => (
-                <div key={idx} className="flex gap-2 text-sm text-orange-700">
-                  <span className="font-bold min-w-[120px]">
-                    {warning.type === 'missing_month' ? '月データ不足' :
-                      warning.type === 'missing_utility' ? '光熱費未登録' : '食数未登録'}
-                  </span>
-                  <span>{warning.message}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {unitManagement.length > 0 && (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
@@ -1653,6 +1629,49 @@ export default function RefundCalculator() {
               )}
 
               {renderTable()}
+            </div>
+          </div>
+        )}
+
+        {unitChanges.length > 0 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              ユニット移動の検出
+            </h3>
+            <div className="space-y-4">
+              {unitChanges.map((change, idx) => (
+                <div key={idx} className="bg-white p-4 rounded border border-yellow-100">
+                  <p className="font-bold text-gray-900">{change.氏名} ({change.利用者ID})</p>
+                  <ul className="mt-2 space-y-1">
+                    {change.変更履歴.map((hist, hIdx) => (
+                      <li key={hIdx} className="text-sm text-gray-600 ml-4 list-disc">
+                        {hist.年月}: {hist.変更前} → <span className="font-bold text-yellow-700">{hist.変更後}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {validationWarnings.length > 0 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
+            <h3 className="text-lg font-bold text-orange-800 mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              データ不足の警告
+            </h3>
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {validationWarnings.map((warning, idx) => (
+                <div key={idx} className="flex gap-2 text-sm text-orange-700">
+                  <span className="font-bold min-w-[120px]">
+                    {warning.type === 'missing_month' ? '月データ不足' :
+                      warning.type === 'missing_utility' ? '光熱費未登録' : '食数未登録'}
+                  </span>
+                  <span>{warning.message}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -1727,8 +1746,17 @@ export default function RefundCalculator() {
             <div className="text-right">
               <p>年間預り金合計: {printingUser.年間預り金合計.toLocaleString()} 円</p>
               <p>年間支出合計: {printingUser.年間支出合計.toLocaleString()} 円</p>
-              <p className="text-lg font-bold border-t-2 border-black mt-2 pt-1 text-green-700">
+              <p className="font-bold mt-2">
                 年間還元金合計: {printingUser.年間還元金合計.toLocaleString()} 円
+              </p>
+              <p className="text-purple-700 mt-2">
+                前年度繰越金: {printingUser.前年度繰越金.toLocaleString()} 円
+              </p>
+              <p className="text-red-700">
+                繰越金: -{printingUser.繰越金.toLocaleString()} 円
+              </p>
+              <p className="text-lg font-bold border-t-2 border-black mt-2 pt-1 text-green-700">
+                最終還元金: {printingUser.最終還元金.toLocaleString()} 円
               </p>
             </div>
           </div>
