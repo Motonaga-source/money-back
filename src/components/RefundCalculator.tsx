@@ -189,28 +189,62 @@ export default function RefundCalculator() {
     return warnings;
   };
 
+  const toHalfWidth = (str: string) => {
+    return str.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
+      .replace(/　/g, ' ');
+  };
+
+  const parseDateString = (dateString: any): { year: number; month: number } | null => {
+    if (!dateString) return null;
+
+    // Handle string or number input
+    const strVal = String(dateString).trim();
+    if (!strVal) return null;
+
+    // If it's a serial date (Excel number)
+    const num = Number(strVal);
+    if (!isNaN(num) && num > 30000 && num < 60000) {
+      // Convert Excel serial date to JS Date
+      // Excel base date Dec 30 1899
+      const date = new Date((num - 25569) * 86400 * 1000);
+      return { year: date.getFullYear(), month: date.getMonth() + 1 };
+    }
+
+    const val = toHalfWidth(strVal);
+    const matches = val.match(/\d+/g);
+    if (!matches || matches.length < 2) return null;
+
+    let year = Number(matches[0]);
+    const month = Number(matches[1]);
+
+    // Handle Wareki (Reiwa) or short years
+    if (val.includes('R') || val.includes('令和') || (year < 100 && year > 0)) {
+      // If it looks like Reiwa (starts around 2019)
+      // e.g., R6 -> 6 + 2018 = 2024
+      // We assume small years are Reiwa era years in this context
+      if (year < 100) {
+        year += 2018;
+      }
+    }
+
+    return { year, month };
+  };
+
   const sortByFiscalYear = (a: string, b: string): number => {
-    const valA = String(a || '');
-    const valB = String(b || '');
-    if (!valA || !valB) return 0;
+    const dateA = parseDateString(a);
+    const dateB = parseDateString(b);
 
-    const partsA = valA.split(/[-/.]/);
-    const partsB = valB.split(/[-/.]/);
+    if (!dateA || !dateB) return 0;
 
-    const yearA = Number(partsA[0]);
-    const monthA = Number(partsA[1]);
-    const yearB = Number(partsB[0]);
-    const monthB = Number(partsB[1]);
-
-    const fiscalYearA = monthA >= 4 ? yearA : yearA - 1;
-    const fiscalYearB = monthB >= 4 ? yearB : yearB - 1;
+    const fiscalYearA = dateA.month >= 4 ? dateA.year : dateA.year - 1;
+    const fiscalYearB = dateB.month >= 4 ? dateB.year : dateB.year - 1;
 
     if (fiscalYearA !== fiscalYearB) {
       return fiscalYearA - fiscalYearB;
     }
 
-    const fiscalMonthA = monthA >= 4 ? monthA - 4 : monthA + 8;
-    const fiscalMonthB = monthB >= 4 ? monthB - 4 : monthB + 8;
+    const fiscalMonthA = dateA.month >= 4 ? dateA.month - 4 : dateA.month + 8;
+    const fiscalMonthB = dateB.month >= 4 ? dateB.month - 4 : dateB.month + 8;
 
     return fiscalMonthA - fiscalMonthB;
   };
@@ -218,15 +252,12 @@ export default function RefundCalculator() {
   const REIWA_6_SPREADSHEET_ID = '1ivn7v7axdZsj8LwpzWHcUl0xeaOutYCzkpykDTsrtgY';
 
   const getFiscalYear = (dateString: string): number => {
-    if (!dateString) return 0;
-    const parts = dateString.split(/[-/.]/);
-    const year = Number(parts[0]);
-    const month = Number(parts[1]);
-    if (isNaN(year) || isNaN(month)) {
+    const date = parseDateString(dateString);
+    if (!date) {
       console.warn(`Invalid date format for fiscal year check: ${dateString}`);
       return 0;
     }
-    return month >= 4 ? year : year - 1;
+    return date.month >= 4 ? date.year : date.year - 1;
   };
 
   const generateUserSummaries = (refunds: CalculatedRefund[]): UserSummary[] => {
@@ -1434,51 +1465,31 @@ export default function RefundCalculator() {
           </div>
         );
       }
-      return renderUserSummaryList(userSummaries);
-    }
 
-
-    if (activeTab === 'mealInput') {
-      return renderMealInput();
-    }
-
-    if (activeData.length === 0) {
-      return (
-        <div className="text-center py-12 text-gray-500">
-          <p className="text-lg mb-2">データがありません</p>
-          <p className="text-sm">
-            {activeTab === 'refundDetail'
-              ? '「還元金計算」ボタンをクリックして計算を実行してください'
-              : 'スプレッドシートIDを入力して「データ読み込み」ボタンをクリックしてください'
-            }
-          </p>
-        </div>
-      );
-    }
-
-    const headers = Object.keys(activeData[0]).filter(key => key !== 'calculated' && key !== 'details');
-    console.log('Rendering table with headers:', headers);
-    console.log('First row data:', activeData[0]);
-
-    if (activeTab === 'userSummary' && spreadsheetId === REIWA_6_SPREADSHEET_ID) {
-      return (
-        <div className="space-y-6">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
-            <h2 className="text-2xl font-bold tracking-tight">
-              令和６年度
-            </h2>
-            <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
-              2024年4月 〜 2025年3月
-            </span>
+      // Show header for Reiwa 6 spreadsheet
+      if (spreadsheetId.trim() === REIWA_6_SPREADSHEET_ID.trim()) {
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
+              <h2 className="text-2xl font-bold tracking-tight">
+                令和６年度
+              </h2>
+              <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
+                2024年4月 〜 2025年3月
+              </span>
+            </div>
+            {renderUserSummaryList(userSummaries)}
           </div>
-          {renderUserSummaryList(activeData as UserSummary[])}
-        </div>
-      );
+        );
+      }
+
+      return renderUserSummaryList(userSummaries);
     }
 
 
     const isRefundDetail = activeTab === 'refundDetail' && activeData.length > 0;
     const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
+    const headers = activeData.length > 0 ? Object.keys(activeData[0]) : [];
 
     return (
       <>
@@ -1566,7 +1577,7 @@ export default function RefundCalculator() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50 sticky top-0 z-10">
               <tr>
-                {headers.map((header) => (
+                {headers.map((header: string) => (
                   <th
                     key={header}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap"
@@ -1579,7 +1590,7 @@ export default function RefundCalculator() {
             <tbody className="bg-white divide-y divide-gray-200">
               {activeData.map((row: any, idx: number) => (
                 <tr key={idx} className="hover:bg-gray-50">
-                  {headers.map((header) => (
+                  {headers.map((header: string) => (
                     <td
                       key={header}
                       className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
