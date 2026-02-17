@@ -1620,7 +1620,7 @@ export default function RefundCalculator() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <FileSpreadsheet className="w-10 h-10 text-blue-600" />
@@ -1820,6 +1820,7 @@ export default function RefundCalculator() {
                 <th className="border p-1">年月</th>
                 <th className="border p-1">預り金</th>
                 <th className="border p-1">家賃</th>
+                <th className="border p-1">家賃補助</th>
                 <th className="border p-1">共益費</th>
                 <th className="border p-1">光熱費</th>
                 <th className="border p-1">食費合計</th>
@@ -1837,6 +1838,7 @@ export default function RefundCalculator() {
                   <td className="border p-1 text-center">{r.年月}</td>
                   <td className="border p-1 text-right">{r.月額預り金.toLocaleString()}</td>
                   <td className="border p-1 text-right">{r.家賃.toLocaleString()}</td>
+                  <td className="border p-1 text-right">{r.家賃補助.toLocaleString()}</td>
                   <td className="border p-1 text-right">{r.共益費.toLocaleString()}</td>
                   <td className="border p-1 text-right">{r.光熱費.toLocaleString()}</td>
                   <td className="border p-1 text-right">{r.食費合計.toLocaleString()}</td>
@@ -1853,7 +1855,7 @@ export default function RefundCalculator() {
               <tr className="bg-gray-50 font-bold">
                 <td className="border p-1 text-center">合計</td>
                 <td className="border p-1 text-right">{printingUser.年間預り金合計.toLocaleString()}</td>
-                <td className="border p-1 text-right colspan-10">
+                <td className="border p-1 text-right colspan-11">
                   {/* Summary spans across other columns visually in paper if needed, but for simplicity: */}
                 </td>
                 <td className="border p-1 text-right"></td>
