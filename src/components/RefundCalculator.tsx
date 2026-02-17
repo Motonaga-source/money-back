@@ -204,7 +204,7 @@ export default function RefundCalculator() {
     return warnings;
   };
 
-  const sortByFiscalYear = (a: any, b: any): number => {
+  const sortByFiscalYear = (a: string, b: string): number => {
     const valA = String(a || '');
     const valB = String(b || '');
     if (!valA || !valB) return 0;
@@ -225,6 +225,14 @@ export default function RefundCalculator() {
     return fiscalMonthA - fiscalMonthB;
   };
 
+  const REIWA_6_SPREADSHEET_ID = '1ivn7v7axdZsj8LwpzWHcUl0xeaOutYCzkpykDTsrtgY';
+
+  const getFiscalYear = (dateString: string): number => {
+    if (!dateString) return 0;
+    const [year, month] = dateString.split('-').map(Number);
+    return month >= 4 ? year : year - 1;
+  };
+
   const generateUserSummaries = (refunds: CalculatedRefund[]): UserSummary[] => {
     const userMap: Record<string, UserSummary> = {};
 
@@ -233,7 +241,12 @@ export default function RefundCalculator() {
       console.log('First carryover balance:', carryoverBalances[0]);
     }
 
-    refunds.forEach((refund) => {
+    // 特定のスプレッドシートIDの場合、令和6年度(2024年度)のデータのみにフィルタリングする
+    const targetRefunds = (spreadsheetId === REIWA_6_SPREADSHEET_ID)
+      ? refunds.filter(r => getFiscalYear(r.年月) === 2024)
+      : refunds;
+
+    targetRefunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
         // 繰越金データを検索 (IDの空白除去などで正規化して比較)
         const targetId = String(refund.利用者ID).trim();
@@ -778,7 +791,7 @@ export default function RefundCalculator() {
             <label className="text-sm font-medium text-gray-700">対象月:</label>
             <select
               value={unitInputMonth}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                 setUnitInputMonth(e.target.value);
                 setPendingUnitChanges({});
               }}
@@ -1014,7 +1027,7 @@ export default function RefundCalculator() {
       // existing records are replaced, new ones (for this month) are added
       // global mealCount needs to be updated with overrides from pendingMealChanges
 
-      const newMealCounts = [...mealCount];
+
 
       // Filter out existing records for the current month that are being updated
       // checking logic: if we have a pending change for user X in month Y, 
@@ -1078,7 +1091,7 @@ export default function RefundCalculator() {
             <label className="text-sm font-medium text-gray-700">対象月:</label>
             <select
               value={mealInputMonth}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
                 setMealInputMonth(e.target.value);
                 setPendingMealChanges({});
               }}
@@ -1199,6 +1212,184 @@ export default function RefundCalculator() {
     }, 100);
   };
 
+  const renderUserSummaryList = (summaries: UserSummary[]) => {
+    return (
+      <div className="space-y-3">
+        {summaries.map((summary) => {
+          const isExpanded = expandedUsers.has(summary.利用者ID);
+          return (
+            <div key={summary.利用者ID} className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                onClick={() => toggleUserExpansion(summary.利用者ID)}
+                className="w-full px-6 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-colors flex items-center justify-between"
+              >
+                <div className="flex items-center gap-4">
+                  <Users className="w-5 h-5 text-blue-600" />
+                  <div className="text-left">
+                    <p className="font-semibold text-gray-900">{summary.氏名}</p>
+                    <p className="text-xs text-gray-500">ID: {summary.利用者ID}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <button
+                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+                      e.stopPropagation();
+                      handlePrint(summary);
+                    }}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
+                    title="印刷"
+                  >
+                    <Printer className="w-5 h-5" />
+                  </button>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">年間預り金</p>
+                    <p className="text-sm font-bold text-blue-600">
+                      {summary.年間預り金合計.toLocaleString()}円
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">年間支出</p>
+                    <p className="text-sm font-bold text-orange-600">
+                      {summary.年間支出合計.toLocaleString()}円
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">年間還元金</p>
+                    <p className="text-sm font-bold text-gray-700">
+                      {summary.年間還元金合計.toLocaleString()}円
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">前年度繰越金</p>
+                    <p className="text-sm font-bold text-purple-600">
+                      {summary.前年度繰越金.toLocaleString()}円
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">繰越金</p>
+                    <p className="text-sm font-bold text-red-600">
+                      -{summary.繰越金.toLocaleString()}円
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-gray-600">最終還元金</p>
+                    <p className="text-lg font-bold text-green-600">
+                      {summary.最終還元金.toLocaleString()}円
+                    </p>
+                  </div>
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                  )}
+                </div>
+              </button>
+
+              {isExpanded && (
+                <div className="bg-white p-4">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 sticky top-0 z-10">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">年月</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">ユニット</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">預り金</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃補助</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">光熱費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">朝食費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">昼食費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">夕食費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">修繕積立金</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">日用品費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">共益費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">金銭管理費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">火災保険</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">食材費</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">還元金</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {summary.月別データ.map((month, idx) => {
+                          // Cast to CalculatedRefund to access new fields
+                          const r = month as CalculatedRefund;
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-gray-900">{r.年月}</td>
+                              <td className="px-4 py-2 text-gray-900">{r.所属ユニット}</td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.月額預り金.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.家賃.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.家賃補助.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.光熱費.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                <div className="font-medium">{r.朝食費.toLocaleString()}</div>
+                                {r.details && (
+                                  <div className="text-[10px] text-gray-500">
+                                    @{r.details.breakfast.unitPrice}×{r.details.breakfast.count}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                <div className="font-medium">{r.昼食費.toLocaleString()}</div>
+                                {r.details && (
+                                  <div className="text-[10px] text-gray-500">
+                                    @{r.details.lunch.unitPrice}×{r.details.lunch.count}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                <div className="font-medium">{r.夕食費.toLocaleString()}</div>
+                                {r.details && (
+                                  <div className="text-[10px] text-gray-500">
+                                    @{r.details.dinner.unitPrice}×{r.details.dinner.count}
+                                    {r.details.event.total > 0 && ` +行事${r.details.event.total}`}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.修繕積立.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.日用品.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.共益費.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.金銭管理費.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.火災保険.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right text-gray-900">
+                                {r.食材費.toLocaleString()}
+                              </td>
+                              <td className="px-4 py-2 text-right font-semibold text-green-600">
+                                {r.当月還元金合計.toLocaleString()}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const tabs = [
     { id: 'mealInput', label: '食数入力', data: [] },
     { id: 'unitInput', label: 'ユニット入力', data: [] },
@@ -1209,6 +1400,7 @@ export default function RefundCalculator() {
     { id: 'refundDetail', label: '還元金明細', data: refundDetail },
     { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
   ];
+
 
   const renderTable = () => {
     if (activeTab === 'mealInput') {
@@ -1230,183 +1422,9 @@ export default function RefundCalculator() {
           </div>
         );
       }
-
-      return (
-        <div className="space-y-3">
-          {userSummaries.map((summary) => {
-            const isExpanded = expandedUsers.has(summary.利用者ID);
-            return (
-              <div key={summary.利用者ID} className="border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleUserExpansion(summary.利用者ID)}
-                  className="w-full px-6 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-colors flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-4">
-                    <Users className="w-5 h-5 text-blue-600" />
-                    <div className="text-left">
-                      <p className="font-semibold text-gray-900">{summary.氏名}</p>
-                      <p className="text-xs text-gray-500">ID: {summary.利用者ID}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrint(summary);
-                      }}
-                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                      title="印刷"
-                    >
-                      <Printer className="w-5 h-5" />
-                    </button>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">年間預り金</p>
-                      <p className="text-sm font-bold text-blue-600">
-                        {summary.年間預り金合計.toLocaleString()}円
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">年間支出</p>
-                      <p className="text-sm font-bold text-orange-600">
-                        {summary.年間支出合計.toLocaleString()}円
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">年間還元金</p>
-                      <p className="text-sm font-bold text-gray-700">
-                        {summary.年間還元金合計.toLocaleString()}円
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">前年度繰越金</p>
-                      <p className="text-sm font-bold text-purple-600">
-                        {summary.前年度繰越金.toLocaleString()}円
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">繰越金</p>
-                      <p className="text-sm font-bold text-red-600">
-                        -{summary.繰越金.toLocaleString()}円
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-gray-600">最終還元金</p>
-                      <p className="text-lg font-bold text-green-600">
-                        {summary.最終還元金.toLocaleString()}円
-                      </p>
-                    </div>
-                    {isExpanded ? (
-                      <ChevronUp className="w-5 h-5 text-gray-400" />
-                    ) : (
-                      <ChevronDown className="w-5 h-5 text-gray-400" />
-                    )}
-                  </div>
-                </button>
-
-                {isExpanded && (
-                  <div className="bg-white p-4">
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200 text-sm">
-                        <thead className="bg-gray-50 sticky top-0 z-10">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">年月</th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">ユニット</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">預り金</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃補助</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">光熱費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">朝食費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">昼食費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">夕食費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">修繕積立金</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">日用品費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">共益費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">金銭管理費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">火災保険</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">食材費</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">還元金</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {summary.月別データ.map((month, idx) => {
-                            // Cast to CalculatedRefund to access new fields
-                            const r = month as CalculatedRefund;
-                            return (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 text-gray-900">{r.年月}</td>
-                                <td className="px-4 py-2 text-gray-900">{r.所属ユニット}</td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.月額預り金.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.家賃.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.家賃補助.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.光熱費.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  <div className="font-medium">{r.朝食費.toLocaleString()}</div>
-                                  {r.details && (
-                                    <div className="text-[10px] text-gray-500">
-                                      @{r.details.breakfast.unitPrice}×{r.details.breakfast.count}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  <div className="font-medium">{r.昼食費.toLocaleString()}</div>
-                                  {r.details && (
-                                    <div className="text-[10px] text-gray-500">
-                                      @{r.details.lunch.unitPrice}×{r.details.lunch.count}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  <div className="font-medium">{r.夕食費.toLocaleString()}</div>
-                                  {r.details && (
-                                    <div className="text-[10px] text-gray-500">
-                                      @{r.details.dinner.unitPrice}×{r.details.dinner.count}
-                                      {r.details.event.total > 0 && ` +行事${r.details.event.total}`}
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.修繕積立.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.日用品.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.共益費.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.金銭管理費.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.火災保険.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-900">
-                                  {r.食材費.toLocaleString()}
-                                </td>
-                                <td className="px-4 py-2 text-right font-semibold text-green-600">
-                                  {r.当月還元金合計.toLocaleString()}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      );
+      return renderUserSummaryList(userSummaries);
     }
+
 
     if (activeTab === 'mealInput') {
       return renderMealInput();
@@ -1429,6 +1447,23 @@ export default function RefundCalculator() {
     const headers = Object.keys(activeData[0]).filter(key => key !== 'calculated' && key !== 'details');
     console.log('Rendering table with headers:', headers);
     console.log('First row data:', activeData[0]);
+
+    if (activeTab === 'userSummary' && spreadsheetId === REIWA_6_SPREADSHEET_ID) {
+      return (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
+            <h2 className="text-2xl font-bold tracking-tight">
+              令和６年度
+            </h2>
+            <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
+              2024年4月 〜 2025年3月
+            </span>
+          </div>
+          {renderUserSummaryList(activeData as UserSummary[])}
+        </div>
+      );
+    }
+
 
     const isRefundDetail = activeTab === 'refundDetail' && activeData.length > 0;
     const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
@@ -1572,7 +1607,7 @@ export default function RefundCalculator() {
             <input
               type="text"
               value={spreadsheetId}
-              onChange={(e) => setSpreadsheetId(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpreadsheetId(e.target.value)}
               placeholder="1X2Y3Z..."
               className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
             />
@@ -1733,11 +1768,19 @@ export default function RefundCalculator() {
       {/* 印刷用レイアウト (非表示、印刷時のみ表示) */}
       {printingUser && (
         <div className="print-only print-content">
-          <h1 className="print-title">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
-          <div className="mb-6 text-sm flex justify-between">
-            <p>利用者ID: {printingUser.利用者ID}</p>
-            <p>印刷日: {new Date().toLocaleDateString('ja-JP')}</p>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="print-title text-2xl font-bold">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
+              {spreadsheetId === REIWA_6_SPREADSHEET_ID && (
+                <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">令和６年度 (2024年4月〜2025年3月)</p>
+              )}
+            </div>
+            <div className="text-right text-sm">
+              <p>利用者ID: {printingUser.利用者ID}</p>
+              <p>印刷日: {new Date().toLocaleDateString('ja-JP')}</p>
+            </div>
           </div>
+
 
           <table className="w-full text-[10px] border-collapse">
             <thead>
