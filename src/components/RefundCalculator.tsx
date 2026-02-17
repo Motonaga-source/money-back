@@ -146,21 +146,6 @@ export default function RefundCalculator() {
       userMonths[record.利用者ID].add(record.年月);
     });
 
-    // 中途入居等は正常な運用の範囲内のため、12ヶ月分のデータ不足警告は非表示にする
-    /*
-    Object.entries(userMonths).forEach(([利用者ID, months]) => {
-      if (months.size < 12) {
-        const user = unitMgmt.find((u) => u.利用者ID === 利用者ID);
-        const missingCount = 12 - months.size;
-        warnings.push({
-          type: 'missing_month',
-          message: `${user?.氏名} (${利用者ID}): ${missingCount}ヶ月分のデータが不足しています`,
-          details: `登録月数: ${months.size}/12ヶ月`,
-        });
-      }
-    });
-    */
-
     const utilityMap = new Map<string, Set<string>>();
     utilityCost.forEach((u) => {
       const key = u.年月;
@@ -209,8 +194,13 @@ export default function RefundCalculator() {
     const valB = String(b || '');
     if (!valA || !valB) return 0;
 
-    const [yearA, monthA] = valA.split('-').map(Number);
-    const [yearB, monthB] = valB.split('-').map(Number);
+    const partsA = valA.split(/[-/.]/);
+    const partsB = valB.split(/[-/.]/);
+
+    const yearA = Number(partsA[0]);
+    const monthA = Number(partsA[1]);
+    const yearB = Number(partsB[0]);
+    const monthB = Number(partsB[1]);
 
     const fiscalYearA = monthA >= 4 ? yearA : yearA - 1;
     const fiscalYearB = monthB >= 4 ? yearB : yearB - 1;
@@ -229,7 +219,13 @@ export default function RefundCalculator() {
 
   const getFiscalYear = (dateString: string): number => {
     if (!dateString) return 0;
-    const [year, month] = dateString.split('-').map(Number);
+    const parts = dateString.split(/[-/.]/);
+    const year = Number(parts[0]);
+    const month = Number(parts[1]);
+    if (isNaN(year) || isNaN(month)) {
+      console.warn(`Invalid date format for fiscal year check: ${dateString}`);
+      return 0;
+    }
     return month >= 4 ? year : year - 1;
   };
 
@@ -242,9 +238,25 @@ export default function RefundCalculator() {
     }
 
     // 特定のスプレッドシートIDの場合、令和6年度(2024年度)のデータのみにフィルタリングする
-    const targetRefunds = (spreadsheetId === REIWA_6_SPREADSHEET_ID)
-      ? refunds.filter(r => getFiscalYear(r.年月) === 2024)
+    // IDの空白を除去して比較
+    const currentId = spreadsheetId.trim();
+    const targetId = REIWA_6_SPREADSHEET_ID.trim();
+
+    console.log(' Spreadsheet ID check:', { current: currentId, target: targetId, match: currentId === targetId });
+
+    const targetRefunds = (currentId === targetId)
+      ? refunds.filter(r => {
+        const fy = getFiscalYear(r.年月);
+        const keep = fy === 2024;
+        // Filter out log spam, show only first failure or success
+        if (r === refunds[0]) {
+          console.log(` Filter check (sample): ${r.年月} -> FY${fy} (Keep: ${keep})`);
+        }
+        return keep;
+      })
       : refunds;
+
+    console.log(` Refunds filtered: ${refunds.length} -> ${targetRefunds.length}`);
 
     targetRefunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
