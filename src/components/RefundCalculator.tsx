@@ -1489,7 +1489,14 @@ export default function RefundCalculator() {
 
     const isRefundDetail = activeTab === 'refundDetail' && activeData.length > 0;
     const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
-    const headers = activeData.length > 0 ? Object.keys(activeData[0]) : [];
+
+    // Filter out complex objects like 'details' that cause React Error #31
+    const headers = activeData.length > 0
+      ? Object.keys(activeData[0]).filter(key => {
+        const val = (activeData[0] as any)[key];
+        return typeof val !== 'object' || val === null;
+      })
+      : [];
 
     return (
       <>
@@ -1597,7 +1604,9 @@ export default function RefundCalculator() {
                     >
                       {typeof row[header] === 'number'
                         ? row[header].toLocaleString('ja-JP')
-                        : row[header] || '-'}
+                        : typeof row[header] === 'object' && row[header] !== null
+                          ? '[詳細]'
+                          : row[header] || '-'}
                     </td>
                   ))}
                 </tr>
