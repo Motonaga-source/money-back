@@ -527,8 +527,8 @@ export default function RefundCalculator() {
       const is退去中 = normalizedStatus.includes('退去');
       const 光熱費 = is退去中 ? 0 : (光熱費総額 * (按分率 / 100)) / ユニット人数;
 
-      // Debug specific users or status
-      if (normalizedStatus.includes('退去') || um.氏名.includes('島田') || um.氏名.includes('橋野')) {
+      // Status check debug logging
+      if (normalizedStatus.includes('退去')) {
         console.log(`🔍 [Status Check] ${um.氏名} (${um.年月}):`, {
           raw: um.ステータス,
           normalized: normalizedStatus,
@@ -1800,17 +1800,11 @@ export default function RefundCalculator() {
       {/* 印刷用レイアウト (非表示、印刷時のみ表示) */}
       {printingUser && (
         <div className="print-only print-content">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="print-title text-2xl font-bold">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
-              {spreadsheetId === REIWA_6_SPREADSHEET_ID && (
-                <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">令和６年度 (2024年4月〜2025年3月)</p>
-              )}
-            </div>
-            <div className="text-right text-sm">
-              <p>利用者ID: {printingUser.利用者ID}</p>
-              <p>印刷日: {new Date().toLocaleDateString('ja-JP')}</p>
-            </div>
+          <div className="mb-6">
+            <h1 className="print-title text-2xl font-bold">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
+            {spreadsheetId === REIWA_6_SPREADSHEET_ID && (
+              <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">令和６年度 (2024年4月〜2025年3月)</p>
+            )}
           </div>
 
 
@@ -1891,7 +1885,8 @@ export default function RefundCalculator() {
             </div>
           </div>
         </div>
-      )}
-    </div>
+      )
+      }
+    </div >
   );
 }

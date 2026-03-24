@@ -5,11 +5,12 @@
 @media print {
   @page {
     size: A4;
-    margin: 10mm;
+    margin: 0;
   }
 
   body {
     background: white !important;
+    padding: 10mm !important;
   }
 
   .no-print {

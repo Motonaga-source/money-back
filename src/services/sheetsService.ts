@@ -43,17 +43,20 @@ export async function fetchSheetData(
   sheetName: string,
   range: string
 ): Promise<string[][]> {
+  const timestamp = Date.now();
   const url = `${API_URL}?sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(
     range
-  )}`;
+  )}&t=${timestamp}`;
 
   console.log(`📖 Fetching sheet: ${sheetName}, URL: ${url}`);
 
   try {
     const response = await fetch(url, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
+      cache: 'no-store', // Disable browser caching
     });
 
     if (!response.ok) {
