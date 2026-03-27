@@ -91,43 +91,43 @@ export async function fetchUnitManagement(spreadsheetId: string): Promise<UnitMa
 
   if (rows.length <= 1) return [];
 
-  console.log('Raw UnitManagement rows (first 2):', rows.slice(0, 2));
+  console.log('Raw UnitManagement headers:', rows[0]);
+
+  // Build a header-to-index map for robustness
+  const headers = rows[0];
+  const h: Record<string, number> = {};
+  headers.forEach((v, i) => { h[v.trim()] = i; });
+
+  // Support both 所属ユニット (old) and ユニット名 (new) for unit column
+  const unitCol = h['所属ユニット'] ?? h['ユニット名'] ?? 3;
 
   const data = rows.slice(1).map((row, index) => {
-    const rawId = parseString(row[1]);
-    const rawName = parseString(row[2]);
-
-    // Validation warning for potential column swap
-    if (index < 5 && rawId.length > rawName.length && !rawId.match(/^[A-Za-z0-9]+$/)) {
-      console.warn(`⚠️ Potential Column Swap Detected in UnitManagement row ${index + 2}: ID="${rawId}", Name="${rawName}". ID usually is shorter and alphanumeric.`);
-    }
-
-    const parsed = {
-      年月: parseString(row[0]),
-      利用者ID: rawId,
-      氏名: rawName,
-      所属ユニット: parseString(row[3]),
-      月額預り金: parseNumber(row[4], '月額預り金'),
-      家賃: parseNumber(row[5], '家賃'),
-      家賃補助: parseNumber(row[6], '家賃補助'),
-      日用品費: parseNumber(row[7], '日用品費'),
-      修繕積立金: parseNumber(row[8], '修繕積立金'),
-      朝食費: parseNumber(row[9], '朝食費'),
-      昼食費: parseNumber(row[10], '昼食費'),
-      夕食費: parseNumber(row[11], '夕食費'),
-      行事食: parseNumber(row[12], '行事食'),
-      共益費: parseNumber(row[13], '共益費'),
-      金銭管理費: parseNumber(row[14], '金銭管理費'),
-      火災保険: parseNumber(row[15], '火災保険'),
-      食材費: parseNumber(row[16], '食材費'),
-      ステータス: parseString(row[18]), // S列
-      備考: parseString(row[17]),     // R列
+    const parsed: UnitManagement = {
+      年月: parseString(row[h['年月'] ?? 0]),
+      利用者ID: parseString(row[h['利用者ID'] ?? 1]),
+      氏名: parseString(row[h['氏名'] ?? 2]),
+      所属ユニット: parseString(row[unitCol]),
+      月額預り金: parseNumber(row[h['月額預り金'] ?? 4], '月額預り金'),
+      家賃: parseNumber(row[h['家賃'] ?? 5], '家賃'),
+      家賃補助: parseNumber(row[h['家賃補助'] ?? 6], '家賃補助'),
+      日用品費: parseNumber(row[h['日用品費'] ?? 7], '日用品費'),
+      修繕積立金: parseNumber(row[h['修繕積立金'] ?? 8], '修繕積立金'),
+      朝食費: parseNumber(row[h['朝食費'] ?? 9], '朝食費'),
+      昼食費: parseNumber(row[h['昼食費'] ?? 10], '昼食費'),
+      夕食費: parseNumber(row[h['夕食費'] ?? 11], '夕食費'),
+      行事食: parseNumber(row[h['行事食'] ?? 12], '行事食'),
+      共益費: parseNumber(row[h['共益費'] ?? 13], '共益費'),
+      金銭管理費: parseNumber(row[h['金銭管理費'] ?? 14], '金銭管理費'),
+      火災保険: parseNumber(row[h['火災保険'] ?? 15], '火災保険'),
+      食材費: parseNumber(row[h['食材費'] ?? 16], '食材費'),
+      // Handle swapped 備考/ステータス order between old/new sheets
+      備考: parseString(row[h['備考'] ?? 17]),
+      ステータス: parseString(row[h['ステータス'] ?? 18]),
     };
 
     if (index === 0) {
       console.log('First UnitManagement parsed:', parsed);
     }
-
     return parsed;
   });
 
@@ -197,33 +197,33 @@ export async function fetchMealCount(spreadsheetId: string): Promise<MealCount[]
 
   if (rows.length <= 1) return [];
 
-  console.log('Raw MealCount rows (first 2):', rows.slice(0, 2));
+  console.log('Raw MealCount headers:', rows[0]);
+
+  // Build header-to-index map to support both old (月) and new (年月) column names
+  const mealHeaders = rows[0];
+  const h: Record<string, number> = {};
+  mealHeaders.forEach((v, i) => { h[v.trim()] = i; });
 
   const data = rows.slice(1).map((row, index) => {
-    const rawId = parseString(row[1]);
-    const rawName = parseString(row[2]);
+    const rawId = parseString(row[h['利用者ID'] ?? 1]);
+    const rawName = parseString(row[h['氏名'] ?? 2]);
+    const monthCol = h['月'] ?? h['年月'] ?? 0;
 
-    // Validation warning for potential column swap
-    if (index < 5 && rawId.length > rawName.length && !rawId.match(/^[A-Za-z0-9]+$/)) {
-      console.warn(`⚠️ Potential Column Swap Detected in MealCount row ${index + 2}: ID="${rawId}", Name="${rawName}". ID usually is shorter and alphanumeric.`);
-    }
-
-    const parsed = {
-      月: parseString(row[0]),
+    const parsed: MealCount = {
+      月: parseString(row[monthCol]),
       利用者ID: rawId,
       氏名: rawName,
-      ユニット名: parseString(row[3]),
-      朝食: parseNumber(row[4], '朝食'),
-      昼食: parseNumber(row[5], '昼食'),
-      夕食: parseNumber(row[6], '夕食'),
-      行事食: parseNumber(row[7], '行事食'),
-      備考: parseString(row[8]),
+      ユニット名: parseString(row[h['ユニット名'] ?? 3]),
+      朝食: parseNumber(row[h['朝食'] ?? 4], '朝食'),
+      昼食: parseNumber(row[h['昼食'] ?? 5], '昼食'),
+      夕食: parseNumber(row[h['夕食'] ?? 6], '夕食'),
+      行事食: parseNumber(row[h['行事食'] ?? 7], '行事食'),
+      備考: parseString(row[h['備考'] ?? 8]),
     };
 
     if (index === 0) {
       console.log('First meal count parsed:', parsed);
     }
-
     return parsed;
   });
 
@@ -237,33 +237,42 @@ export async function fetchRefundDetail(spreadsheetId: string): Promise<RefundDe
 
   if (rows.length <= 1) return [];
 
-  console.log('Raw RefundDetail rows (first 2):', rows.slice(0, 2));
+  console.log('Raw RefundDetail headers:', rows[0]);
+
+  // Build header-to-index map to support both old (17-col) and new (14-col) formats
+  const headers = rows[0];
+  const h: Record<string, number> = {};
+  headers.forEach((v, i) => { h[v.trim()] = i; });
+
+  // 光熱費 or 光熱費実費 both accepted
+  const lightCol = h['光熱費'] ?? h['光熱費実費'] ?? -1;
+  // 修繕積立 or 修繕積立金 both accepted
+  const repairCol = h['修繕積立'] ?? h['修繕積立金'] ?? -1;
 
   const data = rows.slice(1).map((row, index) => {
-    const parsed = {
-      年月: parseString(row[0]),
-      利用者ID: parseString(row[1]),
-      氏名: parseString(row[2]),
-      所属ユニット: parseString(row[3]),
-      月額預り金: parseNumber(row[4], '月額預り金'),
-      家賃: parseNumber(row[5], '家賃'),
-      家賃補助: parseNumber(row[6], '家賃補助'),
-      共益費: parseNumber(row[7], '共益費'),
-      日用品: parseNumber(row[8], '日用品'),
-      修繕積立: parseNumber(row[9], '修繕積立'),
-      食費合計: parseNumber(row[10], '食費合計'),
-      光熱費: parseNumber(row[11], '光熱費'),
-      金銭管理費: parseNumber(row[12], '金銭管理費'),
-      火災保険: parseNumber(row[13], '火災保険'),
-      食材費: parseNumber(row[14], '食材費'),
-      繰越金: parseNumber(row[15], '繰越金'),
-      当月還元金合計: parseNumber(row[16], '当月還元金合計'),
+    const parsed: RefundDetail = {
+      年月: parseString(row[h['年月'] ?? 0]),
+      利用者ID: parseString(row[h['利用者ID'] ?? 1]),
+      氏名: parseString(row[h['氏名'] ?? 2]),
+      所属ユニット: parseString(row[h['所属ユニット'] ?? 3]),
+      月額預り金: parseNumber(row[h['月額預り金'] ?? 4], '月額預り金'),
+      家賃: parseNumber(row[h['家賃'] ?? 5], '家賃'),
+      家賃補助: parseNumber(h['家賃補助'] !== undefined ? row[h['家賃補助']] : undefined, '家賃補助'),
+      共益費: parseNumber(h['共益費'] !== undefined ? row[h['共益費']] : undefined, '共益費'),
+      日用品: parseNumber(row[h['日用品'] ?? h['日用品費'] ?? -1], '日用品'),
+      修繕積立: parseNumber(repairCol >= 0 ? row[repairCol] : undefined, '修繕積立'),
+      食費合計: parseNumber(row[h['食費合計'] ?? -1], '食費合計'),
+      光熱費: parseNumber(lightCol >= 0 ? row[lightCol] : undefined, '光熱費'),
+      金銭管理費: parseNumber(row[h['金銭管理費'] ?? -1], '金銭管理費'),
+      火災保険: parseNumber(row[h['火災保険'] ?? -1], '火災保険'),
+      食材費: parseNumber(h['食材費'] !== undefined ? row[h['食材費']] : undefined, '食材費'),
+      繰越金: parseNumber(row[h['繰越金'] ?? -1], '繰越金'),
+      当月還元金合計: parseNumber(row[h['当月還元金合計'] ?? -1], '当月還元金合計'),
     };
 
     if (index === 0) {
       console.log('First refund detail parsed:', parsed);
     }
-
     return parsed;
   });
 
@@ -277,20 +286,24 @@ export async function fetchCarryoverBalances(spreadsheetId: string): Promise<Car
 
   if (rows.length <= 1) return [];
 
-  console.log('Raw CarryoverBalance rows (first 2):', rows.slice(0, 2));
+  console.log('Raw CarryoverBalance headers:', rows[0]);
+
+  // Build header-to-index map to support both old (4-col) and new (5-col with ユニット名) formats
+  const headers = rows[0];
+  const h: Record<string, number> = {};
+  headers.forEach((v, i) => { h[v.trim()] = i; });
 
   const data = rows.slice(1).map((row, index) => {
-    const parsed = {
-      利用者ID: parseString(row[0]),
-      氏名: parseString(row[1]),
-      前年度繰越金: parseNumber(row[3], '前年度繰越金'),
-      繰越金: parseNumber(row[4], '繰越金'),
+    const parsed: CarryoverBalance = {
+      利用者ID: parseString(row[h['利用者ID'] ?? 0]),
+      氏名: parseString(row[h['氏名'] ?? 1]),
+      前年度繰越金: parseNumber(row[h['前年度繰越金'] ?? 3], '前年度繰越金'),
+      繰越金: parseNumber(row[h['繰越金'] ?? 4], '繰越金'),
     };
 
     if (index === 0) {
       console.log('First carryover balance parsed:', parsed);
     }
-
     return parsed;
   });
 
