@@ -268,12 +268,24 @@ export async function onRequest(context: {
         if (!env.GOOGLE_PRIVATE_KEY) {
             throw new Error('GOOGLE_PRIVATE_KEY is not set');
         }
-        if (!env.SPREADSHEET_ID) {
-            throw new Error('SPREADSHEET_ID is not set');
+        // Determine spreadsheet ID: use parameter if provided, otherwise fallback to environment variable
+        let spreadsheetId = env.SPREADSHEET_ID;
+
+        if (request.method === 'GET') {
+            const url = new URL(request.url);
+            const paramId = url.searchParams.get('spreadsheetId');
+            if (paramId) {
+                spreadsheetId = paramId;
+                console.log(`📊 Using provided Spreadsheet ID (Query): ${spreadsheetId}`);
+            }
+        }
+
+        if (!spreadsheetId) {
+            throw new Error('SPREADSHEET_ID is not set and no spreadsheetId parameter provided');
         }
 
         console.log(`📧 Service Account: ${env.GOOGLE_SERVICE_ACCOUNT_EMAIL}`);
-        console.log(`📊 Spreadsheet ID: ${env.SPREADSHEET_ID}`);
+        console.log(`📊 Spreadsheet ID in use: ${spreadsheetId}`);
 
         // Get access token
         const accessToken = await getAccessToken(
@@ -304,7 +316,7 @@ export async function onRequest(context: {
 
             const data = await readSheet(
                 accessToken,
-                env.SPREADSHEET_ID,
+                spreadsheetId,
                 sheetName,
                 range
             );
@@ -320,9 +332,8 @@ export async function onRequest(context: {
                     },
                 }
             );
-        } else if (request.method === 'POST') {
-            // Write request
-            const body: SheetWriteRequest = await request.json();
+            const body: SheetWriteRequest & { spreadsheetId?: string } = await request.json();
+            const writeSpreadsheetId = body.spreadsheetId || spreadsheetId;
 
             if (!body.sheetName || !body.data) {
                 return new Response(
@@ -341,7 +352,7 @@ export async function onRequest(context: {
 
             const result = await writeSheet(
                 accessToken,
-                env.SPREADSHEET_ID,
+                writeSpreadsheetId,
                 body.sheetName,
                 body.data
             );

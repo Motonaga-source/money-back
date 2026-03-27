@@ -249,7 +249,7 @@ export default function RefundCalculator() {
     return fiscalMonthA - fiscalMonthB;
   };
 
-  const REIWA_6_SPREADSHEET_ID = '1ivn7v7axdZsj8LwpzWHcUl0xeaOutYCzkpykDTsrtgY';
+  // Remove hardcoded ID for fiscal year filtering
 
   const getFiscalYear = (dateString: string): number => {
     const date = parseDateString(dateString);
@@ -268,24 +268,10 @@ export default function RefundCalculator() {
       console.log('First carryover balance:', carryoverBalances[0]);
     }
 
-    // 特定のスプレッドシートIDの場合、令和6年度(2024年度)のデータのみにフィルタリングする
-    // IDの空白を除去して比較
-    const currentId = spreadsheetId.trim();
-    const targetId = REIWA_6_SPREADSHEET_ID.trim();
-
-    console.log(' Spreadsheet ID check:', { current: currentId, target: targetId, match: currentId === targetId });
-
-    const targetRefunds = (currentId === targetId)
-      ? refunds.filter(r => {
-        const fy = getFiscalYear(r.年月);
-        const keep = fy === 2024;
-        // Filter out log spam, show only first failure or success
-        if (r === refunds[0]) {
-          console.log(` Filter check (sample): ${r.年月} -> FY${fy} (Keep: ${keep})`);
-        }
-        return keep;
-      })
-      : refunds;
+    // 年度フィルタ処理
+    // 画面上の選択肢などから動的にフィルタリングすることが望ましいが、
+    // 現在は読み込まれた全データを対象とするか、データ内の最新年度を優先する
+    const targetRefunds = refunds;
 
     console.log(` Refunds filtered: ${refunds.length} -> ${targetRefunds.length}`);
 
@@ -1466,13 +1452,16 @@ export default function RefundCalculator() {
         );
       }
 
-      // Show header for Reiwa 6 spreadsheet
-      if (spreadsheetId.trim() === REIWA_6_SPREADSHEET_ID.trim()) {
+      // 年度情報を表示（データから推測）
+      const months = Array.from(new Set(userSummaries.flatMap(s => s.月別データ.map(m => m.年月)))).sort(sortByFiscalYear as any);
+      const isFY2024 = months.some(m => getFiscalYear(m) === 2024);
+
+      if (isFY2024) {
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
               <h2 className="text-2xl font-bold tracking-tight">
-                令和６年度
+                令和６年度（推計）
               </h2>
               <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
                 2024年4月 〜 2025年3月
@@ -1802,9 +1791,7 @@ export default function RefundCalculator() {
         <div className="print-only print-content">
           <div className="mb-6">
             <h1 className="print-title text-2xl font-bold">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
-            {spreadsheetId === REIWA_6_SPREADSHEET_ID && (
-              <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">令和６年度 (2024年4月〜2025年3月)</p>
-            )}
+            <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">還元金明細書</p>
           </div>
 
 

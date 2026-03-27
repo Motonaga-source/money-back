@@ -46,7 +46,7 @@ export async function fetchSheetData(
   const timestamp = Date.now();
   const url = `${API_URL}?sheetName=${encodeURIComponent(sheetName)}&range=${encodeURIComponent(
     range
-  )}&t=${timestamp}`;
+  )}&spreadsheetId=${encodeURIComponent(_spreadsheetId)}&t=${timestamp}`;
 
   console.log(`📖 Fetching sheet: ${sheetName}, URL: ${url}`);
 
@@ -336,6 +336,7 @@ export async function writeRefundDetail(
       },
       body: JSON.stringify({
         sheetName: config.name,
+        spreadsheetId: _spreadsheetId,
         data,
       }),
     });
@@ -400,6 +401,7 @@ export async function writeMealCount(
       },
       body: JSON.stringify({
         sheetName: config.name,
+        spreadsheetId: _spreadsheetId,
         data,
       }),
     });
@@ -471,6 +473,7 @@ export async function writeUnitManagement(
       },
       body: JSON.stringify({
         sheetName: config.name,
+        spreadsheetId: _spreadsheetId,
         data: rows,
       }),
     });

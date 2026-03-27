@@ -45,10 +45,12 @@ SPREADSHEET_ID=your-spreadsheet-id
 |--------|------|-----|
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Googleサービスアカウントのメールアドレス | `hiroaki@vihara21.iam.gserviceaccount.com` |
 | `GOOGLE_PRIVATE_KEY` | Googleサービスアカウントの秘密鍵（改行を`\n`で表現） | `"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"` |
-| `SPREADSHEET_ID` | Google SpreadsheetsのID | `1ivn7v7axdZsj8LwpzWHcUl0xeaOutYCzkpykDTsrtgY` |
+| `SPREADSHEET_ID` | Google SpreadsheetsのID（デフォルト） | `1ivn7v7axdZsj8LwpzWHcUl0xeaOutYCzkpykDTsrtgY` |
 
-5. **Production**と**Preview**の両方にチェックを入れる
 6. 保存後、再デプロイ
+
+> [!TIP]
+> 画面上の「スプレッドシートID」入力欄にIDを入力すると、環境変数の設定に関わらずそのスプレッドシートに対してデータの読み書きが行われます。入力がない場合は、環境変数の `SPREADSHEET_ID` が使用されます。
 
 ## Google Sheets APIの設定
 
