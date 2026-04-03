@@ -143,11 +143,15 @@ export async function fetchUnitMaster(spreadsheetId: string): Promise<UnitMaster
 
   console.log('Raw UnitMaster rows (first 2):', rows.slice(0, 2));
 
+  const headers = rows[0];
+  const h: Record<string, number> = {};
+  headers.forEach((v, i) => { h[v.trim()] = i; });
+
   const data = rows.slice(1).map((row, index) => {
     const parsed = {
-      ユニット名: parseString(row[0]),
-      家賃: parseNumber(row[1], '家賃'),
-      光熱費按分率: parseNumber(row[2], '光熱費按分率'),
+      ユニット名: parseString(row[h['ユニット名'] ?? 0]),
+      家賃: parseNumber(row[h['家賃'] ?? 1], '家賃'),
+      光熱費按分率: parseNumber(row[h['光熱費按分率'] ?? 2], '光熱費按分率'),
     };
 
     if (index === 0) {
@@ -169,15 +173,19 @@ export async function fetchUnitUtilityCost(spreadsheetId: string): Promise<UnitU
 
   console.log('Raw UnitUtilityCost rows (first 2):', rows.slice(0, 2));
 
+  const headers = rows[0];
+  const h: Record<string, number> = {};
+  headers.forEach((v, i) => { h[v.trim()] = i; });
+
   const data = rows.slice(1).map((row, index) => {
     const parsed = {
-      年月: parseString(row[0]),
-      ユニット名: parseString(row[1]),
-      電気代: parseNumber(row[2], '電気代'),
-      ガス代: parseNumber(row[3], 'ガス代'),
-      水道代: parseNumber(row[4], '水道代'),
-      サブ: parseNumber(row[5], 'サブ'),
-      合計: parseNumber(row[6], '合計'),
+      年月: parseString(row[h['年月'] ?? 0]),
+      ユニット名: parseString(row[h['ユニット名'] ?? 1]),
+      電気代: parseNumber(row[h['電気代'] ?? 2], '電気代'),
+      ガス代: parseNumber(row[h['ガス代'] ?? 3], 'ガス代'),
+      水道代: parseNumber(row[h['水道代'] ?? 4], '水道代'),
+      サブ: parseNumber(row[h['サブ'] ?? 5], 'サブ'),
+      合計: parseNumber(row[h['合計'] ?? 6], '合計'),
     };
 
     if (index === 0) {
