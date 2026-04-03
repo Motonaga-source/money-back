@@ -1454,17 +1454,20 @@ export default function RefundCalculator() {
 
       // 年度情報を表示（データから推測）
       const months = Array.from(new Set(userSummaries.flatMap(s => s.月別データ.map(m => m.年月)))).sort(sortByFiscalYear as any);
-      const isFY2024 = months.some(m => getFiscalYear(m) === 2024);
+      const fiscalYears = Array.from(new Set(months.map(m => getFiscalYear(m))));
+      const latestFY = fiscalYears.length > 0 ? Math.max(...fiscalYears) : null;
 
-      if (isFY2024) {
+      if (latestFY) {
+        const reiwaYear = latestFY - 2018;
+        const reiwaText = reiwaYear === 1 ? '元' : String(reiwaYear);
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
               <h2 className="text-2xl font-bold tracking-tight">
-                令和６年度（推計）
+                令和{reiwaText}年度（推計）
               </h2>
               <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
-                2024年4月 〜 2025年3月
+                {latestFY}年4月 〜 {latestFY + 1}年3月
               </span>
             </div>
             {renderUserSummaryList(userSummaries)}
