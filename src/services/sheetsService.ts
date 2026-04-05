@@ -17,10 +17,16 @@ function parseNumber(value: string | undefined, fieldName?: string): number {
   }
 
   let cleanValue = String(value).trim();
-  cleanValue = cleanValue.replace(/,/g, '');
-  cleanValue = cleanValue.replace(/¥/g, '');
-  cleanValue = cleanValue.replace(/円/g, '');
+  
+  // 全角数字を半角数字に変換
   cleanValue = cleanValue.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
+
+  // 数字、ピリオド、マイナス以外のすべての文字（¥, \, ￥, 円, カンマ, スペースなど）を削除
+  cleanValue = cleanValue.replace(/[^0-9.-]/g, '');
+
+  if (cleanValue === '' || cleanValue === '-') {
+    return 0;
+  }
 
   const parsed = parseFloat(cleanValue);
 

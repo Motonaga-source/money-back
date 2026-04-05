@@ -28,7 +28,6 @@ interface CalculationDetail {
 
 interface CalculatedRefund extends RefundDetail {
   calculated: boolean;
-  ユニット家賃?: number; // Kept for backward compatibility during transition if needed, but using RefundDetail.家賃 now
   朝食費: number;
   昼食費: number;
   夕食費: number;
@@ -85,7 +84,7 @@ export default function RefundCalculator() {
   const [validationWarnings, setValidationWarnings] = useState<ValidationWarning[]>([]);
   const [userSummaries, setUserSummaries] = useState<UserSummary[]>([]);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
-  const [printingUser, setPrintingUser] = useState<UserSummary | null>(null);
+  const [printingUsers, setPrintingUsers] = useState<UserSummary[]>([]);
   const [summaryEndMonth, setSummaryEndMonth] = useState<string>('all');
 
   const normalizeStatus = (s: string) => (s || '').trim().replace(/[\s\u3000]/g, '');
@@ -105,7 +104,6 @@ export default function RefundCalculator() {
     });
 
     const changes: UnitChange[] = [];
-
     Object.entries(userUnitHistory).forEach(([利用者ID, history]) => {
       const sortedHistory = history.sort((a, b) => a.年月.localeCompare(b.年月));
       const 変更履歴: { 年月: string; 変更前: string; 変更後: string }[] = [];
@@ -138,21 +136,10 @@ export default function RefundCalculator() {
     meals: MealCount[]
   ): ValidationWarning[] => {
     const warnings: ValidationWarning[] = [];
-
-    const userMonths: Record<string, Set<string>> = {};
-    unitMgmt.forEach((record) => {
-      if (!userMonths[record.利用者ID]) {
-        userMonths[record.利用者ID] = new Set();
-      }
-      userMonths[record.利用者ID].add(record.年月);
-    });
-
     const utilityMap = new Map<string, Set<string>>();
     utilityCost.forEach((u) => {
       const key = u.年月;
-      if (!utilityMap.has(key)) {
-        utilityMap.set(key, new Set());
-      }
+      if (!utilityMap.has(key)) utilityMap.set(key, new Set());
       utilityMap.get(key)!.add(u.ユニット名);
     });
 
@@ -170,9 +157,7 @@ export default function RefundCalculator() {
     const mealMap = new Map<string, Set<string>>();
     meals.forEach((m) => {
       const key = m.月;
-      if (!mealMap.has(key)) {
-        mealMap.set(key, new Set());
-      }
+      if (!mealMap.has(key)) mealMap.set(key, new Set());
       mealMap.get(key)!.add(m.利用者ID);
     });
 
@@ -191,22 +176,16 @@ export default function RefundCalculator() {
   };
 
   const toHalfWidth = (str: string) => {
-    return str.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0))
-      .replace(/　/g, ' ');
+    return str.replace(/[！-～]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/　/g, ' ');
   };
 
   const parseDateString = (dateString: any): { year: number; month: number } | null => {
     if (!dateString) return null;
-
-    // Handle string or number input
     const strVal = String(dateString).trim();
     if (!strVal) return null;
 
-    // If it's a serial date (Excel number)
     const num = Number(strVal);
     if (!isNaN(num) && num > 30000 && num < 60000) {
-      // Convert Excel serial date to JS Date
-      // Excel base date Dec 30 1899
       const date = new Date((num - 25569) * 86400 * 1000);
       return { year: date.getFullYear(), month: date.getMonth() + 1 };
     }
@@ -217,98 +196,40 @@ export default function RefundCalculator() {
 
     let year = Number(matches[0]);
     const month = Number(matches[1]);
-
-    // Handle Wareki (Reiwa) or short years
     if (val.includes('R') || val.includes('令和') || (year < 100 && year > 0)) {
-      // If it looks like Reiwa (starts around 2019)
-      // e.g., R6 -> 6 + 2018 = 2024
-      // We assume small years are Reiwa era years in this context
-      if (year < 100) {
-        year += 2018;
-      }
+      if (year < 100) year += 2018;
     }
-
     return { year, month };
   };
 
   const sortByFiscalYear = (a: string, b: string): number => {
     const dateA = parseDateString(a);
     const dateB = parseDateString(b);
-
     if (!dateA || !dateB) return 0;
-
     const fiscalYearA = dateA.month >= 4 ? dateA.year : dateA.year - 1;
     const fiscalYearB = dateB.month >= 4 ? dateB.year : dateB.year - 1;
-
-    if (fiscalYearA !== fiscalYearB) {
-      return fiscalYearA - fiscalYearB;
-    }
-
+    if (fiscalYearA !== fiscalYearB) return fiscalYearA - fiscalYearB;
     const fiscalMonthA = dateA.month >= 4 ? dateA.month - 4 : dateA.month + 8;
     const fiscalMonthB = dateB.month >= 4 ? dateB.month - 4 : dateB.month + 8;
-
     return fiscalMonthA - fiscalMonthB;
   };
 
-  // Remove hardcoded ID for fiscal year filtering
-
   const getFiscalYear = (dateString: string): number => {
     const date = parseDateString(dateString);
-    if (!date) {
-      console.warn(`Invalid date format for fiscal year check: ${dateString}`);
-      return 0;
-    }
+    if (!date) return 0;
     return date.month >= 4 ? date.year : date.year - 1;
   };
 
   const generateUserSummaries = (refunds: CalculatedRefund[]): UserSummary[] => {
     const userMap: Record<string, UserSummary> = {};
-
-    console.log('🔍 Carryover balances available:', carryoverBalances.length);
-    if (carryoverBalances.length > 0) {
-      console.log('First carryover balance:', carryoverBalances[0]);
-    }
-
-    // 年度フィルタ処理
-    // 画面上の選択肢などから動的にフィルタリングすることが望ましいが、
-    // 現在は読み込まれた全データを対象とするか、データ内の最新年度を優先する
-    const targetRefunds = refunds;
-
-    console.log(` Refunds filtered: ${refunds.length} -> ${targetRefunds.length}`);
-
-    targetRefunds.forEach((refund) => {
+    refunds.forEach((refund) => {
       if (!userMap[refund.利用者ID]) {
-        // 繰越金データを検索 (IDの空白除去などで正規化して比較)
         const targetId = String(refund.利用者ID).trim();
         let carryover = carryoverBalances.find(c => String(c.利用者ID).trim() === targetId);
-
         if (!carryover) {
           const normalize = (s: string) => (s || '').replace(/\s|　/g, '');
-          const nameMatch = carryoverBalances.find(c => normalize(c.氏名) === normalize(refund.氏名));
-          if (nameMatch) {
-            console.warn(`⚠️ Using name fallback for ${refund.氏名}: from ID="${refund.利用者ID}" to "${nameMatch.利用者ID}"`);
-            carryover = nameMatch;
-          }
+          carryover = carryoverBalances.find(c => normalize(c.氏名) === normalize(refund.氏名));
         }
-
-        if (carryover) {
-          console.log(`✅ Found carryover for ${refund.利用者ID} (${refund.氏名}):`, carryover);
-        } else {
-          // デバッグ: IDが一致しないが名前が一致する場合や、近いIDがあるか確認
-          const nameMatch = carryoverBalances.find(c => c.氏名 === refund.氏名);
-          if (nameMatch) {
-            console.warn(`⚠️ Name matched but ID mismatch for ${refund.氏名}: Refund ID="${refund.利用者ID}" vs Carryover ID="${nameMatch.利用者ID}"`);
-            console.log('Type comparison:', {
-              refundIdType: typeof refund.利用者ID,
-              carryoverIdType: typeof nameMatch.利用者ID,
-              refundIdVal: `"${refund.利用者ID}"`,
-              carryoverIdVal: `"${nameMatch.利用者ID}"`
-            });
-          } else {
-            console.log(`⚠️ No carryover found for ${refund.利用者ID} (${refund.氏名})`);
-          }
-        }
-
         userMap[refund.利用者ID] = {
           利用者ID: refund.利用者ID,
           氏名: refund.氏名,
@@ -321,38 +242,23 @@ export default function RefundCalculator() {
           月別データ: [],
         };
       }
-
       const summary = userMap[refund.利用者ID];
       summary.年間預り金合計 += refund.月額預り金;
-      // 実質的な支出 = 家賃(満額) + 家賃補助(マイナス) + その他
       summary.年間支出合計 += refund.家賃 + refund.家賃補助 + refund.共益費 + refund.日用品 + refund.修繕積立 +
         refund.食費合計 + refund.光熱費 + refund.金銭管理費 + refund.火災保険 + refund.食材費;
       summary.年間還元金合計 += refund.当月還元金合計;
       summary.月別データ.push(refund);
     });
 
-    // 最終還元金を計算: 年間還元金 + 前年度繰越金 - 繰越金
     Object.values(userMap).forEach((summary) => {
       summary.月別データ.sort((a, b) => sortByFiscalYear(a.年月, b.年月));
       summary.最終還元金 = summary.年間還元金合計 + summary.前年度繰越金 - summary.繰越金;
     });
-
     return Object.values(userMap).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
   };
 
-  // Recalculate user summaries whenever refund detail or carryover balances change
   useEffect(() => {
     if (refundDetail.length > 0) {
-      console.log('🔄 Updating user summaries due to data change', {
-        refunds: refundDetail.length,
-        carryover: carryoverBalances.length
-      });
-      if (refundDetail.length > 0) {
-        console.log('Refund Sample ID:', `"${refundDetail[0].利用者ID}"`, typeof refundDetail[0].利用者ID);
-      }
-      if (carryoverBalances.length > 0) {
-        console.log('Carryover Sample ID:', `"${carryoverBalances[0].利用者ID}"`, typeof carryoverBalances[0].利用者ID);
-      }
       const summaries = generateUserSummaries(refundDetail);
       setUserSummaries(summaries);
     }
@@ -360,1610 +266,311 @@ export default function RefundCalculator() {
 
   const filteredSummaries = useMemo(() => {
     if (summaryEndMonth === 'all') return userSummaries;
-
     const allMonths = Array.from(new Set(userSummaries.flatMap(s => s.月別データ.map(m => m.年月)))).sort(sortByFiscalYear as any);
     const endIndex = allMonths.indexOf(summaryEndMonth);
-    
     if (endIndex === -1) return userSummaries;
-
     const targetMonths = new Set(allMonths.slice(0, endIndex + 1));
-
     return userSummaries.map(user => {
       const filteredData = user.月別データ.filter(m => targetMonths.has(m.年月));
-      
-      let 年間預り金合計 = 0;
-      let 年間支出合計 = 0;
-      let 年間還元金合計 = 0;
-
+      let 年間預り金合計 = 0, 年間支出合計 = 0, 年間還元金合計 = 0;
       filteredData.forEach(r => {
         年間預り金合計 += r.月額預り金 || 0;
-        年間支出合計 += (r.家賃 || 0) + (r.家賃補助 || 0) + (r.共益費 || 0) + 
-                      (r.日用品 || 0) + (r.修繕積立 || 0) + (r.食費合計 || 0) + 
-                      (r.光熱費 || 0) + (r.金銭管理費 || 0) + (r.火災保険 || 0) + (r.食材費 || 0);
+        年間支出合計 += (r.家賃 || 0) + (r.家賃補助 || 0) + (r.共益費 || 0) + (r.日用品 || 0) + (r.修繕積立 || 0) + (r.食費合計 || 0) + (r.光熱費 || 0) + (r.金銭管理費 || 0) + (r.火災保険 || 0) + (r.食材費 || 0);
         年間還元金合計 += r.当月還元金合計 || 0;
       });
-
-      const 最終還元金 = 年間還元金合計 + user.前年度繰越金 - user.繰越金;
-
-      return {
-        ...user,
-        年間預り金合計,
-        年間支出合計,
-        年間還元金合計,
-        最終還元金,
-        月別データ: filteredData
-      };
+      return { ...user, 年間預り金合計, 年間支出合計, 年間還元金合計, 最終還元金: 年間還元金合計 + user.前年度繰越金 - user.繰越金, 月別データ: filteredData };
     });
   }, [userSummaries, summaryEndMonth]);
 
   const loadAllData = async () => {
-    if (!spreadsheetId.trim()) {
-      setError('スプレッドシートIDを入力してください');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
+    if (!spreadsheetId.trim()) { setError('スプレッドシートIDを入力してください'); return; }
+    setLoading(true); setError(null); setSuccessMessage(null);
     try {
-      console.log('Loading data from spreadsheet:', spreadsheetId);
-
-      const [
-        unitManagementData,
-        unitMasterData,
-        unitUtilityCostData,
-        mealCountData,
-        refundDetailData,
-        carryoverBalanceData,
-      ] = await Promise.all([
-        fetchUnitManagement(spreadsheetId),
-        fetchUnitMaster(spreadsheetId),
-        fetchUnitUtilityCost(spreadsheetId),
-        fetchMealCount(spreadsheetId),
-        fetchRefundDetail(spreadsheetId),
-        fetchCarryoverBalances(spreadsheetId),
+      const [uMgmt, uMaster, uUtil, mCount, rDetail, cBal] = await Promise.all([
+        fetchUnitManagement(spreadsheetId), fetchUnitMaster(spreadsheetId), fetchUnitUtilityCost(spreadsheetId),
+        fetchMealCount(spreadsheetId), fetchRefundDetail(spreadsheetId), fetchCarryoverBalances(spreadsheetId),
       ]);
-
-      console.log('Data loaded successfully:', {
-        unitManagement: unitManagementData.length,
-        unitMaster: unitMasterData.length,
-        unitUtilityCost: unitUtilityCostData.length,
-        mealCount: mealCountData.length,
-        refundDetail: refundDetailData.length,
-        carryoverBalance: carryoverBalanceData.length,
-      });
-
-      setUnitManagement(unitManagementData);
-      setUnitMaster(unitMasterData);
-      setUnitUtilityCost(unitUtilityCostData);
-      setMealCount(mealCountData);
-      setCarryoverBalances(carryoverBalanceData);
-      // 型キャストして初期化
-      setRefundDetail(refundDetailData.map((r: RefundDetail) => ({
-        ...r,
-        calculated: false,
-        家賃補助: 0,
-        ユニット家賃: 0,
-        朝食費: 0,
-        昼食費: 0,
-        夕食費: 0
-      } as CalculatedRefund)));
-
-      const changes = detectUnitChanges(unitManagementData);
-      setUnitChanges(changes);
-      console.log('🔄 ユニット変更検出:', changes);
-
-      const warnings = validateData(unitManagementData, unitUtilityCostData, mealCountData);
-      setValidationWarnings(warnings);
-      console.log('⚠️ データ検証:', warnings.length > 0 ? `${warnings.length}件の警告` : '問題なし');
-    } catch (err) {
-      console.error('Error loading data:', err);
-      const errorMessage = err instanceof Error ? err.message : 'データの読み込みに失敗しました';
-      setError(`エラー: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
+      setUnitManagement(uMgmt); setUnitMaster(uMaster); setUnitUtilityCost(uUtil); setMealCount(mCount); setCarryoverBalances(cBal);
+      setRefundDetail(rDetail.map((r: RefundDetail) => ({ ...r, calculated: false, 朝食費: 0, 昼食費: 0, 夕食費: 0 } as CalculatedRefund)));
+      setUnitChanges(detectUnitChanges(uMgmt));
+      setValidationWarnings(validateData(uMgmt, uUtil, mCount));
+    } catch (err: any) { setError(`エラー: ${err.message}`); } finally { setLoading(false); }
   };
-  const calculateRefunds = () => {
-    let successCount = 0;
-    let warningCount = 0;
 
-    // ユニットごとの人数を月別に計算（「退去中」を除外）
+  const calculateRefunds = () => {
+    let successCount = 0, warningCount = 0;
     const unitMemberCount: Record<string, number> = {};
-    unitManagement.forEach((um: UnitManagement) => {
-      const normalizedStatus = normalizeStatus(um.ステータス);
-      const is退去中 = normalizedStatus.includes('退去');
-      if (!is退去中) {
+    unitManagement.forEach((um) => {
+      if (!normalizeStatus(um.ステータス).includes('退去')) {
         const key = `${um.年月}_${um.所属ユニット}`;
         unitMemberCount[key] = (unitMemberCount[key] || 0) + 1;
       }
     });
 
-    const calculated: CalculatedRefund[] = unitManagement.map((um: UnitManagement, index: number) => {
+    const calculated: CalculatedRefund[] = unitManagement.map((um) => {
       const unit = unitMaster.find((u) => u.ユニット名 === um.所属ユニット);
-      const utility = unitUtilityCost.find(
-        (u) => u.ユニット名 === um.所属ユニット && u.年月 === um.年月
-      );
-      const meal = mealCount.find(
-        (m) => m.利用者ID === um.利用者ID && m.月 === um.年月
-      );
+      const utility = unitUtilityCost.find((u) => u.ユニット名 === um.所属ユニット && u.年月 === um.年月);
+      const meal = mealCount.find((m) => m.利用者ID === um.利用者ID && m.月 === um.年月);
+      const ユニット人数 = unitMemberCount[`${um.年月}_${um.所属ユニット}`] || 1;
+      if (unit && utility && meal) successCount++; else warningCount++;
 
-      const unitKey = `${um.年月}_${um.所属ユニット}`;
-      const ユニット人数 = unitMemberCount[unitKey] || 1;
+      const 実質家賃 = Math.max(0, (um.家賃 || 0) + (um.家賃補助 || 0));
+      const 食費合計 = (meal?.朝食 || 0) * (um.朝食費 || 0) + (meal?.昼食 || 0) * (um.昼食費 || 0) + (meal?.夕食 || 0) * (um.夕食費 || 0) + (meal?.行事食 || 0) * (um.行事食 || 0);
+      const 光熱費 = normalizeStatus(um.ステータス).includes('退去') ? 0 : ((utility?.合計 || 0) * ((unit?.光熱費按分率 || 0) / 100)) / ユニット人数;
+      const 当月還元金合計 = (um.月額預り金 || 0) - 実質家賃 - (um.共益費 || 0) - (um.日用品費 || 0) - (um.修繕積立金 || 0) - 食費合計 - 光熱費 - (um.金銭管理費 || 0) - (um.火災保険 || 0) - (um.食材費 || 0);
 
-      const hasAllData = unit && utility && meal;
-      if (hasAllData) {
-        successCount++;
-      } else {
-        warningCount++;
-      }
-
-      if (!utility) {
-        console.warn(`⚠️ [${index + 1}] ${um.氏名}: 光熱費データが見つかりません`, {
-          検索条件: { ユニット名: um.所属ユニット, 年月: um.年月 },
-          利用可能な光熱費データ: unitUtilityCost.map(u => ({ ユニット名: u.ユニット名, 年月: u.年月 })),
-        });
-      }
-
-      if (!unit) {
-        console.warn(`⚠️ [${index + 1}] ${um.氏名}: ユニットマスタが見つかりません`, {
-          検索条件: { ユニット名: um.所属ユニット },
-          利用可能なユニット: unitMaster.map(u => u.ユニット名),
-        });
-      }
-
-      console.log(`[${index + 1}/${unitManagement.length}] ${um.氏名} (${um.利用者ID})`, {
-        ユニットマスタ: unit ? '✓' : '✗',
-        光熱費データ: utility ? '✓' : '✗',
-        食数データ: meal ? '✓' : '✗',
-        ユニット人数: `${ユニット人数}人`,
-      });
-
-      const 月額預り金 = um.月額預り金 || 0;
-      const 家賃補助 = um.家賃補助 || 0;
-      const ユニット家賃 = um.家賃 || 0;
-
-      // 実質負担する家賃 = ユニット本来の家賃 + 家賃補助 (家賃補助がマイナス値のため足し算)
-      const 実質家賃 = Math.max(0, ユニット家賃 + 家賃補助);
-
-      const 日用品 = um.日用品費 || 0;
-      const 修繕積立 = um.修繕積立金 || 0;
-
-      const 朝食回数 = meal?.朝食 || 0;
-      const 昼食回数 = meal?.昼食 || 0;
-      const 夕食回数 = meal?.夕食 || 0;
-      const 行事食回数 = meal?.行事食 || 0;
-
-      const 朝食単価 = um.朝食費 || 0;
-      const 昼食単価 = um.昼食費 || 0;
-      const 夕食単価 = um.夕食費 || 0;
-      const 行事食単価 = um.行事食 || 0;
-
-      const 朝食費 = 朝食回数 * 朝食単価;
-      const 昼食費 = 昼食回数 * 昼食単価;
-      const 夕食費 = 夕食回数 * 夕食単価;
-      const 行事食費 = 行事食回数 * 行事食単価;
-
-      const 食費合計 = 朝食費 + 昼食費 + 夕食費 + 行事食費;
-
-      const 光熱費総額 = utility?.合計 || 0;
-      const 按分率 = unit?.光熱費按分率 || 0;
-      const normalizedStatus = normalizeStatus(um.ステータス);
-      const is退去中 = normalizedStatus.includes('退去');
-      const 光熱費 = is退去中 ? 0 : (光熱費総額 * (按分率 / 100)) / ユニット人数;
-
-      // Status check debug logging
-      if (normalizedStatus.includes('退去')) {
-        console.log(`🔍 [Status Check] ${um.氏名} (${um.年月}):`, {
-          raw: um.ステータス,
-          normalized: normalizedStatus,
-          is退去中: is退去中,
-          cost: is退去中 ? 0 : 光熱費,
-          unit_count: ユニット人数
-        });
-      }
-
-      if (index < 3 || 光熱費 === 0) {
-        console.log(`💡 [${index + 1}] ${um.氏名} - 光熱費計算:`, {
-          ステータス: um.ステータス || '通常',
-          正規化ステータス: normalizedStatus,
-          光熱費総額: `${光熱費総額.toLocaleString()}円`,
-          按分率: `${按分率}%`,
-          ユニット人数: `${ユニット人数}人 (退去中除く)`,
-          計算式: is退去中 ? '退去中のため 0円' : `${光熱費総額} × (${按分率} ÷ 100) ÷ ${ユニット人数}`,
-          光熱費: `${光熱費.toLocaleString()}円`,
-          utilityデータあり: !!utility,
-          unitデータあり: !!unit,
-        });
-      }
-
-      const 金銭管理費 = um.金銭管理費 || 0;
-      const 火災保険 = um.火災保険 || 0;
-      const 共益費 = um.共益費 || 0;
-      const 食材費 = um.食材費 || 0;
-
-      const 当月還元金合計 = 月額預り金 - 実質家賃 - 共益費 - 日用品 - 修繕積立 - 食費合計 - 光熱費 - 金銭管理費 - 火災保険 - 食材費;
-
-      if (index === 0) {
-        console.log(`📊 計算例 (${um.氏名}):`, {
-          月額預り金: `${月額預り金.toLocaleString()}円`,
-          ユニット家賃: `${ユニット家賃.toLocaleString()}円`,
-          家賃補助: `${家賃補助.toLocaleString()}円`,
-          実質家賃負担: `${実質家賃.toLocaleString()}円 (= ${ユニット家賃} + ${家賃補助})`,
-          日用品: `${日用品.toLocaleString()}円`,
-          修繕積立: `${修繕積立.toLocaleString()}円`,
-          食費: `朝${朝食回数}回×${朝食単価}円 + 昼${昼食回数}回×${昼食単価}円 + 夕${夕食回数}回×${夕食単価}円 + 行事${行事食回数}回×${行事食単価}円 = ${食費合計.toLocaleString()}円`,
-          光熱費: `${光熱費総額.toLocaleString()}円 × ${按分率}% ÷ ${ユニット人数}人 = ${光熱費.toLocaleString()}円`,
-          金銭管理費: `${金銭管理費.toLocaleString()}円`,
-          火災保険: `${火災保険.toLocaleString()}円`,
-          計算式: `${月額預り金.toLocaleString()} - ${実質家賃.toLocaleString()} - ${日用品.toLocaleString()} - ${修繕積立.toLocaleString()} - ${食費合計.toLocaleString()} - ${Math.round(光熱費).toLocaleString()} - ${金銭管理費.toLocaleString()} - ${火災保険.toLocaleString()}`,
-          還元金: `${当月還元金合計.toLocaleString()}円`,
-        });
-      }
-
-      const result: CalculatedRefund = {
-        年月: um.年月,
-        利用者ID: um.利用者ID,
-        氏名: um.氏名,
-        所属ユニット: um.所属ユニット,
-        月額預り金: Math.round(月額預り金),
-        家賃: Math.round(ユニット家賃), // Store original unit rent (満額)
-        家賃補助: Math.round(家賃補助),
-        共益費: Math.round(共益費),
-        日用品: Math.round(日用品),
-        修繕積立: Math.round(修繕積立),
-        食費合計: Math.round(食費合計),
-        朝食費: Math.round(朝食費),
-        昼食費: Math.round(昼食費),
-        夕食費: Math.round(夕食費 + 行事食費),
-        光熱費: Math.round(光熱費),
-        金銭管理費: Math.round(金銭管理費),
-        火災保険: Math.round(火災保険),
-        食材費: Math.round(食材費),
-        繰越金: 0,
-        当月還元金合計: Math.round(当月還元金合計),
-        calculated: true,
+      return {
+        年月: um.年月, 利用者ID: um.利用者ID, 氏名: um.氏名, 所属ユニット: um.所属ユニット, 月額預り金: Math.round(um.月額預り金 || 0),
+        家賃: Math.round(um.家賃 || 0), 家賃補助: Math.round(um.家賃補助 || 0), 共益費: Math.round(um.共益費 || 0),
+        日用品: Math.round(um.日用品費 || 0), 修繕積立: Math.round(um.修繕積立金 || 0), 食費合計: Math.round(食費合計),
+        朝食費: Math.round((meal?.朝食 || 0) * (um.朝食費 || 0)), 昼食費: Math.round((meal?.昼食 || 0) * (um.昼食費 || 0)),
+        夕食費: Math.round(((meal?.夕食 || 0) * (um.夕食費 || 0)) + ((meal?.行事食 || 0) * (um.行事食 || 0))),
+        光熱費: Math.round(光熱費), 金銭管理費: Math.round(um.金銭管理費 || 0), 火災保険: Math.round(um.火災保険 || 0),
+        食材費: Math.round(um.食材費 || 0), 繰越金: 0, 当月還元金合計: Math.round(当月還元金合計), calculated: true,
         details: {
-          breakfast: { count: 朝食回数, unitPrice: 朝食単価, total: 朝食費 },
-          lunch: { count: 昼食回数, unitPrice: 昼食単価, total: 昼食費 },
-          dinner: { count: 夕食回数, unitPrice: 夕食単価, total: 夕食費 },
-          event: { count: 行事食回数, unitPrice: 行事食単価, total: 行事食費 },
+          breakfast: { count: meal?.朝食 || 0, unitPrice: um.朝食費 || 0, total: (meal?.朝食 || 0) * (um.朝食費 || 0) },
+          lunch: { count: meal?.昼食 || 0, unitPrice: um.昼食費 || 0, total: (meal?.昼食 || 0) * (um.昼食費 || 0) },
+          dinner: { count: meal?.夕食 || 0, unitPrice: um.夕食費 || 0, total: (meal?.夕食 || 0) * (um.夕食費 || 0) },
+          event: { count: meal?.行事食 || 0, unitPrice: um.行事食 || 0, total: (meal?.行事食 || 0) * (um.行事食 || 0) },
         }
       };
-
-      return result;
-    });
-
-    const totalRefund = calculated.reduce((sum, r) => sum + r.当月還元金合計, 0);
-
-    console.log(`✅ 計算完了: ${calculated.length}件 (成功: ${successCount}, 警告: ${warningCount})`);
-    console.log('計算結果サマリー:', {
-      総預り金: calculated.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString() + '円',
-      総支出: calculated.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString() + '円',
-      総還元金: totalRefund.toLocaleString() + '円',
     });
 
     setRefundDetail(calculated);
-
-    setRefundDetail(calculated);
-
-    // Summaries will be updated automatically by useEffect when refundDetail changes
-    // const summaries = generateUserSummaries(calculated);
-    // setUserSummaries(summaries);
-    console.log('📊 利用者別サマリー生成トリガー: データ更新待ち');
-
-    // Auto-switch to refundDetail only if we were in unitManagement or unitUtilityCost
-    // If we are in mealInput, we might want to stay there
-    if (activeTab === 'unitManagement' || activeTab === 'unitUtilityCost') {
-      setActiveTab('refundDetail');
-    }
-
-    if (warningCount > 0) {
-      setError(`⚠️ 計算完了しましたが、${warningCount}件のデータに不足があります。コンソールで詳細を確認してください。`);
-      setSuccessMessage(null);
-    } else {
-      setError(null);
-      setSuccessMessage(`✅ ${calculated.length}名の還元金計算が完了しました！総還元金: ${totalRefund.toLocaleString()}円`);
-    }
+    if (activeTab === 'unitManagement' || activeTab === 'unitUtilityCost') setActiveTab('refundDetail');
+    if (warningCount > 0) setError(`⚠️ 計算完了しましたが、${warningCount}件のデータに不足があります。`);
+    else setSuccessMessage(`✅ ${calculated.length}名の還元金計算が完了しました！`);
   };
 
   const writeToSheet = async () => {
-    if (!refundDetail.length) {
-      setError('計算結果がありません。先に「還元金計算」を実行してください。');
-      return;
-    }
-
-    if (!spreadsheetId.trim()) {
-      setError('スプレッドシートIDを入力してください');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
+    if (!refundDetail.length || !spreadsheetId.trim()) { setError('データ不足またはID未入力です'); return; }
+    setLoading(true); setError(null); setSuccessMessage(null);
     try {
-      console.log(`📤 スプレッドシートに${refundDetail.length}件の還元金明細を書き込み中...`);
-
-      const refundsToWrite: RefundDetail[] = refundDetail.map((r: CalculatedRefund) => ({
-        年月: r.年月,
-        利用者ID: r.利用者ID,
-        氏名: r.氏名,
-        所属ユニット: r.所属ユニット,
-        月額預り金: r.月額預り金,
-        家賃: r.家賃,
-        日用品: r.日用品,
-        修繕積立: r.修繕積立,
-        食費合計: r.食費合計,
-        光熱費: r.光熱費,
-        金銭管理費: r.金銭管理費,
-        火災保険: r.火災保険,
-        繰越金: r.繰越金,
-        当月還元金合計: r.当月還元金合計,
-      }));
-
-      const result = await writeRefundDetail(spreadsheetId, refundsToWrite);
-
-      console.log(`✅ 書き込み完了: ${result.updatedRows}行`);
-      setSuccessMessage(`✅ スプレッドシートに${result.updatedRows}行を書き込みました！`);
-      setError(null);
-    } catch (err: any) {
-      console.error('書き込みエラー:', err);
-      setError(`書き込みに失敗しました: ${err.message}`);
-      setSuccessMessage(null);
-    } finally {
-      setLoading(false);
-    }
+      await writeRefundDetail(spreadsheetId, refundDetail.map(r => ({
+        年月: r.年月, 利用者ID: r.利用者ID, 氏名: r.氏名, 所属ユニット: r.所属ユニット, 月額預り金: r.月額預り金, 家賃: r.家賃, 家賃補助: r.家賃補助, 共益費: r.共益費,
+        日用品: r.日用品, 修繕積立: r.修繕積立, 食費合計: r.食費合計, 光熱費: r.光熱費, 金銭管理費: r.金銭管理費, 火災保険: r.火災保険, 食材費: r.食材費, 繰越金: r.繰越金, 当月還元金合計: r.当月還元金合計,
+      })));
+      setSuccessMessage(`✅ スプレッドシートに書き込みました！`);
+    } catch (err: any) { setError(`書き込み失敗: ${err.message}`); } finally { setLoading(false); }
   };
 
-  // --- Meal Input Logic ---
-  const [mealInputMonth, setMealInputMonth] = useState<string>('');
+  // --- Meal & Unit Input Logic ---
+  const [mealInputMonth, setMealInputMonth] = useState('');
   const [pendingMealChanges, setPendingMealChanges] = useState<Record<string, MealCount>>({});
-
-  // --- Unit Input Logic ---
-  const [unitInputMonth, setUnitInputMonth] = useState<string>('');
+  const [unitInputMonth, setUnitInputMonth] = useState('');
   const [pendingUnitChanges, setPendingUnitChanges] = useState<Record<string, UnitManagement>>({});
 
-  // Initialize months when data loads or tab changes
   useEffect(() => {
     if ((activeTab === 'mealInput' || activeTab === 'unitInput') && unitManagement.length > 0) {
       const months = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
       if (months.length > 0) {
-        const latestMonth = months[months.length - 1];
-        if (activeTab === 'mealInput' && !mealInputMonth) {
-          setMealInputMonth(latestMonth);
-        } else if (activeTab === 'unitInput' && !unitInputMonth) {
-          setUnitInputMonth(latestMonth);
-        }
+        const latest = months[months.length - 1];
+        if (activeTab === 'mealInput' && !mealInputMonth) setMealInputMonth(latest);
+        else if (activeTab === 'unitInput' && !unitInputMonth) setUnitInputMonth(latest);
       }
     }
-  }, [activeTab, unitManagement, mealInputMonth, unitInputMonth]);
+  }, [activeTab, unitManagement]);
 
-  const handleUnitInputChange = (userId: string, field: keyof UnitManagement, value: number | string) => {
-    setPendingUnitChanges(prev => {
-      const currentUnit = prev[userId] || unitManagement.find(u => u.利用者ID === userId && u.年月 === unitInputMonth) || {
-        年月: unitInputMonth,
-        利用者ID: userId,
-        氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
-        所属ユニット: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
-        月額預り金: 0,
-        家賃: 0,
-        家賃補助: 0,
-        日用品費: 0,
-        修繕積立金: 0,
-        朝食費: 0,
-        昼食費: 0,
-        夕食費: 0,
-        行事食: 0,
-        金銭管理費: 0,
-        火災保険: 0,
-        共益費: 0,
-        食材費: 0,
-        ステータス: '',
-        備考: '',
-      };
-
-      return {
-        ...prev,
-        [userId]: {
-          ...currentUnit,
-          [field]: value
-        }
-      };
-    });
+  const handleMealInputChange = (userId: string, field: keyof MealCount, value: any) => {
+    setPendingMealChanges(prev => ({ ...prev, [userId]: { ...(prev[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || { 月: mealInputMonth, 利用者ID: userId, 氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '', ユニット名: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '', 朝食: 0, 昼食: 0, 夕食: 0, 行事食: 0, 備考: '' }), [field]: value } }));
   };
-
-  const getUnitValue = (userId: string): UnitManagement => {
-    if (pendingUnitChanges[userId]) {
-      return pendingUnitChanges[userId];
-    }
-    const existing = unitManagement.find(u => u.利用者ID === userId && u.年月 === unitInputMonth);
-    if (existing) return existing;
-
-    const user = unitManagement.find(u => u.利用者ID === userId);
-    return {
-      年月: unitInputMonth,
-      利用者ID: userId,
-      氏名: user?.氏名 || '',
-      所属ユニット: user?.所属ユニット || '',
-      月額預り金: 0,
-      家賃: 0,
-      家賃補助: 0,
-      日用品費: 0,
-      修繕積立金: 0,
-      朝食費: 0,
-      昼食費: 0,
-      夕食費: 0,
-      行事食: 0,
-      金銭管理費: 0,
-      火災保険: 0,
-      備考: '',
-    };
-  };
-
-  const saveUnitManagement = async () => {
-    if (!unitInputMonth) return;
-
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    try {
-      const updates = Object.values(pendingUnitChanges).filter(u => u.年月 === unitInputMonth);
-
-      if (updates.length === 0) {
-        setLoading(false);
-        return;
-      }
-
-      const unitMap = new Map<string, UnitManagement>(unitManagement.map(u => [`${u.年月}_${u.利用者ID}`, u]));
-
-      updates.forEach((update: UnitManagement) => {
-        unitMap.set(`${update.年月}_${update.利用者ID}`, update);
-      });
-
-      const finalUnitManagement: UnitManagement[] = Array.from(unitMap.values());
-
-      const result = await writeUnitManagement(spreadsheetId, finalUnitManagement);
-
-      setUnitManagement(finalUnitManagement);
-      setPendingUnitChanges({});
-      setSuccessMessage(`✅ ${unitInputMonth}分のユニット管理データを保存しました (${result.updatedRows}行)`);
-
-    } catch (err: any) {
-      console.error('Save unit management error:', err);
-      setError(`保存に失敗しました: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderUnitInput = () => {
-    if (unitManagement.length === 0) {
-      return (
-        <div className="text-center py-12 text-gray-500">
-          <p className="text-sm">データが読み込まれていません。</p>
-        </div>
-      );
-    }
-
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
-    const activeUsers = unitManagement
-      .filter(u => u.年月 === unitInputMonth)
-      .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
-
-    return (
-      <div className="space-y-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">対象月:</label>
-            <select
-              value={unitInputMonth}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                setUnitInputMonth(e.target.value);
-                setPendingUnitChanges({});
-              }}
-              className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-            >
-              {availableMonths.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-            <span className="text-sm text-gray-500 ml-2">
-              対象者: {activeUsers.length}名
-            </span>
-          </div>
-          <button
-            onClick={saveUnitManagement}
-            disabled={Object.keys(pendingUnitChanges).length === 0 || loading}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            保存する
-          </button>
-        </div>
-
-        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-x-auto overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-20">氏名 / ユニット</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-28">月額預り金</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">家賃補助</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">日用品費</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">修繕積立</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">朝食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">昼食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">夕食単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-20">行事単価</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">共益費</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">金銭管理</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">火災保険</th>
-                <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">食材費</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px]">備考</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeUsers.map((user) => {
-                const unitData = getUnitValue(user.利用者ID);
-                const hasChanges = !!pendingUnitChanges[user.利用者ID];
-
-                return (
-                  <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
-                    <td className="px-4 py-4 whitespace-nowrap sticky left-0 bg-inherit z-10 border-r border-gray-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
-                      <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
-                      <div className="text-sm text-gray-500">{user.所属ユニット}</div>
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.月額預り金}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '月額預り金', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-24 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.家賃}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.家賃補助}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '家賃補助', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.日用品費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '日用品費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.修繕積立金}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '修繕積立金', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.朝食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '朝食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.昼食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '昼食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.夕食費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '夕食費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.行事食}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '行事食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.共益費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '共益費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.金銭管理費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '金銭管理費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-20 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.火災保険}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '火災保険', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-1 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        className="w-16 text-right border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.食材費}
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '食材費', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={unitData.備考 || ''}
-                        placeholder="メモ"
-                        onChange={(e) => handleUnitInputChange(user.利用者ID, '備考', e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  const handleMealInputChange = (userId: string, field: keyof MealCount, value: number | string) => {
-    setPendingMealChanges(prev => {
-      const currentMeal = prev[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || {
-        月: mealInputMonth,
-        利用者ID: userId,
-        氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '',
-        ユニット名: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '',
-        朝食: 0,
-        昼食: 0,
-        夕食: 0,
-        行事食: 0,
-        備考: '',
-      };
-
-      return {
-        ...prev,
-        [userId]: {
-          ...currentMeal,
-          [field]: value
-        }
-      };
-    });
-  };
-
-  const getMealValue = (userId: string): MealCount => {
-    if (pendingMealChanges[userId]) {
-      return pendingMealChanges[userId];
-    }
-    const existing = mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth);
-    if (existing) return existing;
-
-    const user = unitManagement.find(u => u.利用者ID === userId && u.年月 === mealInputMonth);
-    return {
-      月: mealInputMonth,
-      利用者ID: userId,
-      氏名: user?.氏名 || '',
-      ユニット名: user?.所属ユニット || '',
-      朝食: 0,
-      昼食: 0,
-      夕食: 0,
-      行事食: 0,
-      備考: '',
-    };
-  };
+  const getMealValue = (userId: string) => pendingMealChanges[userId] || mealCount.find(m => m.利用者ID === userId && m.月 === mealInputMonth) || { 月: mealInputMonth, 利用者ID: userId, 氏名: '', ユニット名: '', 朝食: 0, 昼食: 0, 夕食: 0, 行事食: 0, 備考: '' };
 
   const saveMealCounts = async () => {
     if (!mealInputMonth) return;
-
-    setLoading(true);
-    setError(null);
-    setSuccessMessage(null);
-
-    try {
-      // 1. Merge pending changes into complete mealCount list
-      // existing records are replaced, new ones (for this month) are added
-      // global mealCount needs to be updated with overrides from pendingMealChanges
-
-
-
-      // Filter out existing records for the current month that are being updated
-      // checking logic: if we have a pending change for user X in month Y, 
-      // we need to make sure we update the entry in the main list.
-
+    setLoading(true); try {
       const updates = Object.values(pendingMealChanges).filter(m => m.月 === mealInputMonth);
-
-      if (updates.length === 0) {
-        setLoading(false);
-        return; // Nothing to save
+      if (updates.length) {
+        const mealMap = new Map(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
+        updates.forEach(u => mealMap.set(`${u.月}_${u.利用者ID}`, u));
+        const final = Array.from(mealMap.values());
+        await writeMealCount(spreadsheetId, final);
+        setMealCount(final); setPendingMealChanges({}); setSuccessMessage(`✅ 保存しました`);
       }
-
-      // Create a map for easier access to existing records
-      // Key: "Month_UserID"
-      const mealMap = new Map<string, MealCount>(mealCount.map(m => [`${m.月}_${m.利用者ID}`, m]));
-
-      // Apply updates
-      updates.forEach((update: MealCount) => {
-        mealMap.set(`${update.月}_${update.利用者ID}`, update);
-      });
-
-      const finalMealCounts: MealCount[] = Array.from(mealMap.values());
-
-      // 2. Write to sheet
-      const result = await writeMealCount(spreadsheetId, finalMealCounts);
-
-      // 3. Update local state
-      setMealCount(finalMealCounts);
-      setPendingMealChanges({});
-      setSuccessMessage(`✅ ${mealInputMonth}分の食数データを保存しました (${result.updatedRows}行)`);
-
-    } catch (err: any) {
-      console.error('Save meal error:', err);
-      setError(`保存に失敗しました: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
 
+  const handleUnitInputChange = (userId: string, field: keyof UnitManagement, value: any) => {
+    setPendingUnitChanges(prev => ({ ...prev, [userId]: { ...(prev[userId] || unitManagement.find(u => u.利用者ID === userId && u.年月 === unitInputMonth) || { 年月: unitInputMonth, 利用者ID: userId, 氏名: unitManagement.find(u => u.利用者ID === userId)?.氏名 || '', 所属ユニット: unitManagement.find(u => u.利用者ID === userId)?.所属ユニット || '', 月額預り金: 0, 家賃: 0, 家賃補助: 0, 日用品費: 0, 修繕積立金: 0, 朝食費: 0, 昼食費: 0, 夕食費: 0, 行事食: 0, 共益費: 0, 金銭管理費: 0, 火災保険: 0, 食材費: 0, ステータス: '通常', 備考: '' }), [field]: value } }));
+  };
+  const getUnitValue = (userId: string) => pendingUnitChanges[userId] || unitManagement.find(u => u.利用者ID === userId && u.年月 === unitInputMonth) || { 年月: unitInputMonth, 利用者ID: userId, 氏名: '', 所属ユニット: '', 月額預り金: 0, 家賃: 0, 家賃補助: 0, 日用品費: 0, 修繕積立金: 0, 朝食費: 0, 昼食費: 0, 夕食費: 0, 行事食: 0, 共益費: 0, 金銭管理費: 0, 火災保険: 0, 食材費: 0, ステータス: '通常', 備考: '' };
+
+  const saveUnitManagement = async () => {
+    if (!unitInputMonth) return;
+    setLoading(true); try {
+      const updates = Object.values(pendingUnitChanges).filter(u => u.年月 === unitInputMonth);
+      if (updates.length) {
+        const unitMap = new Map(unitManagement.map(u => [`${u.年月}_${u.利用者ID}`, u]));
+        updates.forEach(u => unitMap.set(`${u.年月}_${u.利用者ID}`, u));
+        const final = Array.from(unitMap.values());
+        await writeUnitManagement(spreadsheetId, final);
+        setUnitManagement(final); setPendingUnitChanges({}); setSuccessMessage(`✅ 保存しました`);
+      }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  // --- Rendering Functions ---
   const renderMealInput = () => {
-    if (unitManagement.length === 0) {
-      return (
-        <div className="text-center py-12 text-gray-500">
-          <p className="text-sm">データが読み込まれていません。</p>
-        </div>
-      );
-    }
-
-    const availableMonths = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
-
-    // Filter users belonging to the selected month in UnitManagement
-    // This ensures we only show active users for that month
-    const activeUsers = unitManagement
-      .filter(u => u.年月 === mealInputMonth)
-      .sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
-
+    const activeUsers = unitManagement.filter(u => u.年月 === mealInputMonth).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
     return (
       <div className="space-y-6">
-        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
+        <div className="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <label className="text-sm font-medium text-gray-700">対象月:</label>
-            <select
-              value={mealInputMonth}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
-                setMealInputMonth(e.target.value);
-                setPendingMealChanges({});
-              }}
-              className="block w-40 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
-            >
-              {availableMonths.map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
+            <select value={mealInputMonth} onChange={(e) => { setMealInputMonth(e.target.value); setPendingMealChanges({}); }} className="block w-40 rounded-md border-gray-300 shadow-sm p-2 border">
+              {Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any).map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-            <span className="text-sm text-gray-500 ml-2">
-              対象者: {activeUsers.length}名
-            </span>
           </div>
-          <button
-            onClick={saveMealCounts}
-            disabled={Object.keys(pendingMealChanges).length === 0 || loading}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
-          >
-            <Save className="w-4 h-4 mr-2" />
-            保存する
-          </button>
+          <button onClick={saveMealCounts} disabled={!Object.keys(pendingMealChanges).length || loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm disabled:bg-gray-400">保存する</button>
         </div>
-
-        <div className="bg-white shadow border border-gray-200 sm:rounded-lg max-h-[70vh] overflow-x-auto overflow-y-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">氏名 / ユニット</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">朝食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">昼食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">夕食</th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-24">行事食</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">備考</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeUsers.map((user) => {
-                const mealData = getMealValue(user.利用者ID);
-                const hasChanges = !!pendingMealChanges[user.利用者ID];
-
-                return (
-                  <tr key={user.利用者ID} className={hasChanges ? "bg-yellow-50" : "hover:bg-gray-50"}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{user.氏名}</div>
-                      <div className="text-sm text-gray-500">{user.所属ユニット}</div>
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.朝食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '朝食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.昼食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '昼食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.夕食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '夕食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-2 py-4 whitespace-nowrap text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        className="w-16 text-center border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.行事食}
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '行事食', Number(e.target.value))}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <input
-                        type="text"
-                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm border p-1"
-                        value={mealData.備考 || ''}
-                        placeholder="メモ"
-                        onChange={(e) => handleMealInputChange(user.利用者ID, '備考', e.target.value)}
-                      />
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <div className="bg-white shadow border sm:rounded-lg overflow-x-auto"><table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-medium uppercase">氏名 / ユニット</th><th className="px-4 py-3 text-center">朝食</th><th className="px-4 py-3 text-center">昼食</th><th className="px-4 py-3 text-center">夕食</th><th className="px-4 py-3 text-center">行事食</th><th className="px-6 py-3">備考</th></tr></thead>
+          <tbody className="bg-white divide-y divide-gray-200">{activeUsers.map(user => { const m = getMealValue(user.利用者ID); return (<tr key={user.利用者ID}><td className="px-6 py-4"><div>{user.氏名}</div><div className="text-xs text-gray-500">{user.所属ユニット}</div></td><td className="px-2 py-4 text-center"><input type="number" className="w-16 text-center border p-1" value={m.朝食} onChange={e => handleMealInputChange(user.利用者ID, '朝食', Number(e.target.value))} /></td><td className="px-2 py-4 text-center"><input type="number" className="w-16 text-center border p-1" value={m.昼食} onChange={e => handleMealInputChange(user.利用者ID, '昼食', Number(e.target.value))} /></td><td className="px-2 py-4 text-center"><input type="number" className="w-16 text-center border p-1" value={m.夕食} onChange={e => handleMealInputChange(user.利用者ID, '夕食', Number(e.target.value))} /></td><td className="px-2 py-4 text-center"><input type="number" className="w-16 text-center border p-1" value={m.行事食} onChange={e => handleMealInputChange(user.利用者ID, '行事食', Number(e.target.value))} /></td><td className="px-6 py-4"><input type="text" className="w-full border p-1" value={m.備考 || ''} onChange={e => handleMealInputChange(user.利用者ID, '備考', e.target.value)} /></td></tr>); })}</tbody>
+        </table></div>
       </div>
     );
   };
 
-
-  const toggleUserExpansion = (userId: string) => {
-    const newExpanded = new Set(expandedUsers);
-    if (newExpanded.has(userId)) {
-      newExpanded.delete(userId);
-    } else {
-      newExpanded.add(userId);
-    }
-    setExpandedUsers(newExpanded);
-  };
-
-  const handlePrint = (summary: UserSummary) => {
-    setPrintingUser(summary);
-    // Wait for the state to be applied before printing
-    setTimeout(() => {
-      window.print();
-    }, 100);
-  };
-
-  const renderUserSummaryList = (summaries: UserSummary[]) => {
+  const renderUnitInput = () => {
+    const activeUsers = unitManagement.filter(u => u.年月 === unitInputMonth).sort((a, b) => a.利用者ID.localeCompare(b.利用者ID));
     return (
-      <div className="space-y-3">
-        {summaries.map((summary) => {
-          const isExpanded = expandedUsers.has(summary.利用者ID);
-          return (
-            <div key={summary.利用者ID} className="border border-gray-200 rounded-lg overflow-hidden">
-              <button
-                onClick={() => toggleUserExpansion(summary.利用者ID)}
-                className="w-full px-6 py-4 bg-gradient-to-r from-slate-50 to-gray-50 hover:from-slate-100 hover:to-gray-100 transition-colors flex items-center justify-between"
-              >
-                <div className="flex items-center gap-4">
-                  <Users className="w-5 h-5 text-blue-600" />
-                  <div className="text-left">
-                    <p className="font-semibold text-gray-900">{summary.氏名}</p>
-                    <p className="text-xs text-gray-500">ID: {summary.利用者ID}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-6">
-                  <button
-                    onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                      e.stopPropagation();
-                      handlePrint(summary);
-                    }}
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors"
-                    title="印刷"
-                  >
-                    <Printer className="w-5 h-5" />
-                  </button>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">年間預り金</p>
-                    <p className="text-sm font-bold text-blue-600">
-                      {summary.年間預り金合計.toLocaleString()}円
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">年間支出</p>
-                    <p className="text-sm font-bold text-orange-600">
-                      {summary.年間支出合計.toLocaleString()}円
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">年間還元金</p>
-                    <p className="text-sm font-bold text-gray-700">
-                      {summary.年間還元金合計.toLocaleString()}円
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">前年度繰越金</p>
-                    <p className="text-sm font-bold text-purple-600">
-                      {summary.前年度繰越金.toLocaleString()}円
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">繰越金</p>
-                    <p className="text-sm font-bold text-red-600">
-                      -{summary.繰越金.toLocaleString()}円
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-gray-600">最終還元金</p>
-                    <p className="text-lg font-bold text-green-600">
-                      {summary.最終還元金.toLocaleString()}円
-                    </p>
-                  </div>
-                  {isExpanded ? (
-                    <ChevronUp className="w-5 h-5 text-gray-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
-                  )}
-                </div>
-              </button>
-
-              {isExpanded && (
-                <div className="bg-white p-4">
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50 sticky top-0 z-10">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">年月</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-700">ユニット</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">預り金</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">家賃補助</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">光熱費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">朝食費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">昼食費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700 w-32">夕食費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">修繕積立金</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">日用品費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">共益費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">金銭管理費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">火災保険</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">食材費</th>
-                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-700">還元金</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {summary.月別データ.map((month, idx) => {
-                          // Cast to CalculatedRefund to access new fields
-                          const r = month as CalculatedRefund;
-                          
-                          // 再計算済みの場合はdetailsを使用、そうでない場合はキャッシュされたデータから補完
-                          const matchMeal = r.calculated ? null : mealCount.find(m => m.利用者ID === r.利用者ID && m.月 === r.年月);
-                          const matchUnit = r.calculated ? null : unitManagement.find(u => u.利用者ID === r.利用者ID && u.年月 === r.年月);
-
-                          const bCount = r.details?.breakfast.count ?? matchMeal?.朝食 ?? 0;
-                          const bPrice = r.details?.breakfast.unitPrice ?? matchUnit?.朝食費 ?? 0;
-                          const bTotal = r.calculated ? r.朝食費 : (bCount * bPrice);
-
-                          const lCount = r.details?.lunch.count ?? matchMeal?.昼食 ?? 0;
-                          const lPrice = r.details?.lunch.unitPrice ?? matchUnit?.昼食費 ?? 0;
-                          const lTotal = r.calculated ? r.昼食費 : (lCount * lPrice);
-
-                          const dCount = r.details?.dinner.count ?? matchMeal?.夕食 ?? 0;
-                          const dPrice = r.details?.dinner.unitPrice ?? matchUnit?.夕食費 ?? 0;
-                          const eCount = r.details?.event.count ?? matchMeal?.行事食 ?? 0;
-                          const ePrice = r.details?.event.unitPrice ?? matchUnit?.行事食 ?? 0;
-                          const eTotal = r.details?.event.total ?? (eCount * ePrice);
-                          const dTotal = r.calculated ? r.夕食費 : (dCount * dPrice + eTotal);
-
-                          return (
-                            <tr key={idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-gray-900">{r.年月}</td>
-                              <td className="px-4 py-2 text-gray-900">{r.所属ユニット}</td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.月額預り金.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.家賃.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.家賃補助.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.光熱費.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{bTotal.toLocaleString()}</div>
-                                {(bCount > 0 || r.details) && (
-                                  <div className="text-[10px] text-gray-500">
-                                    @{bPrice}×{bCount}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{lTotal.toLocaleString()}</div>
-                                {(lCount > 0 || r.details) && (
-                                  <div className="text-[10px] text-gray-500">
-                                    @{lPrice}×{lCount}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{dTotal.toLocaleString()}</div>
-                                {(dCount > 0 || eCount > 0 || r.details) && (
-                                  <div className="text-[10px] text-gray-500">
-                                    @{dPrice}×{dCount}
-                                    {eTotal > 0 && ` +行事${eTotal}`}
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.修繕積立.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.日用品.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.共益費.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.金銭管理費.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.火災保険.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right text-gray-900">
-                                {r.食材費.toLocaleString()}
-                              </td>
-                              <td className="px-4 py-2 text-right font-semibold text-green-600">
-                                {r.当月還元金合計.toLocaleString()}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
+          <select value={unitInputMonth} onChange={(e) => { setUnitInputMonth(e.target.value); setPendingUnitChanges({}); }} className="block w-40 rounded-md border-gray-300 shadow-sm p-2 border">
+            {Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any).map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <button onClick={saveUnitManagement} disabled={!Object.keys(pendingUnitChanges).length || loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm disabled:bg-gray-400">保存する</button>
+        </div>
+        <div className="bg-white shadow border sm:rounded-lg overflow-x-auto overflow-y-auto max-h-[70vh]"><table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50 sticky top-0 z-10"><tr><th className="px-4 py-3 text-left text-xs sticky left-0 bg-gray-50 z-20">氏名 / ユニット</th><th className="px-2 py-3">預り金</th><th className="px-2 py-3">家賃</th><th className="px-2 py-3">賃補</th><th className="px-2 py-3">日用品</th><th className="px-2 py-3">修繕</th><th className="px-2 py-3">朝単</th><th className="px-2 py-3">昼単</th><th className="px-2 py-3">夕単</th><th className="px-2 py-3">行単</th><th className="px-2 py-3">共益</th><th className="px-2 py-3">管</th><th className="px-2 py-3">保</th><th className="px-2 py-3">食</th><th className="px-4 py-3">備考</th></tr></thead>
+          <tbody className="bg-white divide-y divide-gray-200">{activeUsers.map(user => { const uData = getUnitValue(user.利用者ID); return (<tr key={user.利用者ID} className="hover:bg-gray-50"><td className="px-4 py-4 sticky left-0 bg-white z-10 border-r border-gray-100 shadow-sm"><div>{user.氏名}</div><div className="text-xs text-gray-500">{user.所属ユニット}</div></td>
+            <td><input type="number" className="w-24 border p-1" value={uData.月額預り金} onChange={e => handleUnitInputChange(user.利用者ID, '月額預り金', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-24 border p-1" value={uData.家賃} onChange={e => handleUnitInputChange(user.利用者ID, '家賃', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-20 border p-1" value={uData.家賃補助} onChange={e => handleUnitInputChange(user.利用者ID, '家賃補助', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-20 border p-1" value={uData.日用品費} onChange={e => handleUnitInputChange(user.利用者ID, '日用品費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-20 border p-1" value={uData.修繕積立金} onChange={e => handleUnitInputChange(user.利用者ID, '修繕積立金', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.朝食費} onChange={e => handleUnitInputChange(user.利用者ID, '朝食費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.昼食費} onChange={e => handleUnitInputChange(user.利用者ID, '昼食費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.夕食費} onChange={e => handleUnitInputChange(user.利用者ID, '夕食費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.行事食} onChange={e => handleUnitInputChange(user.利用者ID, '行事食', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.共益費} onChange={e => handleUnitInputChange(user.利用者ID, '共益費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-20 border p-1" value={uData.金銭管理費} onChange={e => handleUnitInputChange(user.利用者ID, '金銭管理費', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-20 border p-1" value={uData.火災保険} onChange={e => handleUnitInputChange(user.利用者ID, '火災保険', Number(e.target.value))} /></td>
+            <td><input type="number" className="w-16 border p-1" value={uData.食材費} onChange={e => handleUnitInputChange(user.利用者ID, '食材費', Number(e.target.value))} /></td>
+            <td><input type="text" className="w-full border p-1" value={uData.備考 || ''} onChange={e => handleUnitInputChange(user.利用者ID, '備考', e.target.value)} /></td></tr>); })}</tbody>
+        </table></div>
       </div>
     );
   };
 
-  const tabs = [
-    { id: 'mealInput', label: '食数入力', data: [] },
-    { id: 'unitInput', label: 'ユニット入力', data: [] },
-    { id: 'unitManagement', label: 'ユニット管理', data: unitManagement },
-    { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
-    { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost },
-    { id: 'mealCount', label: '食数計算(参照)', data: mealCount },
-    { id: 'refundDetail', label: '還元金明細', data: refundDetail },
-    { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
-  ];
-
+  const handlePrint = (summary: UserSummary) => { setPrintingUsers([summary]); setTimeout(() => window.print(), 100); };
+  const handlePrintAll = (summaries: UserSummary[]) => { setPrintingUsers(summaries); setTimeout(() => window.print(), 100); };
+  const toggleUserExpansion = (userId: string) => { const n = new Set(expandedUsers); if (n.has(userId)) n.delete(userId); else n.add(userId); setExpandedUsers(n); };
 
   const renderTable = () => {
-    if (activeTab === 'mealInput') {
-      return renderMealInput();
-    }
-
-    if (activeTab === 'unitInput') {
-      return renderUnitInput();
-    }
-
-    const activeData = tabs.find((t) => t.id === activeTab)?.data || [];
-
+    if (activeTab === 'mealInput') return renderMealInput();
+    if (activeTab === 'unitInput') return renderUnitInput();
+    const tabs = [
+      { id: 'unitManagement', label: 'ユニット管理', data: unitManagement }, { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
+      { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost }, { id: 'mealCount', label: '食数計算(参照)', data: mealCount },
+      { id: 'refundDetail', label: '還元金明細', data: refundDetail }, { id: 'userSummary', label: '利用者別サマリー', data: userSummaries },
+    ];
     if (activeTab === 'userSummary') {
-      if (userSummaries.length === 0) {
-        return (
-          <div className="text-center py-12 text-gray-500">
-            <p className="text-lg mb-2">データがありません</p>
-            <p className="text-sm">「還元金計算」ボタンをクリックして計算を実行してください</p>
-          </div>
-        );
-      }
-
-      // 年度情報を表示（データから推測）
       const months = Array.from(new Set(userSummaries.flatMap(s => s.月別データ.map(m => m.年月)))).sort(sortByFiscalYear as any);
-      const fiscalYears = Array.from(new Set(months.map(m => getFiscalYear(m))));
-      const latestFY = fiscalYears.length > 0 ? Math.max(...fiscalYears) : null;
-
-      const headerControls = (
-        <div className="flex items-center gap-4 text-black">
-          <label className="text-sm font-medium text-white opacity-90">対象期間:</label>
-          <select
-            value={summaryEndMonth}
-            onChange={(e) => setSummaryEndMonth(e.target.value)}
-            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm px-3 py-1 outline-none"
-          >
-            <option value="all">通年（すべて）</option>
-            {months.map(m => (
-              <option key={m} value={m}>{m} まで表示</option>
-            ))}
-          </select>
-        </div>
-      );
-
-      if (latestFY) {
-        const reiwaYear = latestFY - 2018;
-        const reiwaText = reiwaYear === 1 ? '元' : String(reiwaYear);
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
-              <div>
-                <h2 className="text-2xl font-bold tracking-tight">
-                  令和{reiwaText}年度（推計）
-                </h2>
-                <div className="text-sm opacity-90 mt-1">
-                  {latestFY}年4月 〜 {latestFY + 1}年3月
-                </div>
-              </div>
-              {headerControls}
-            </div>
-            {renderUserSummaryList(filteredSummaries)}
-          </div>
-        );
-      }
-
+      const latestFY = months.length > 0 ? getFiscalYear(months[months.length - 1]) : 0;
       return (
         <div className="space-y-6">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
-            <h2 className="text-xl font-bold tracking-tight">利用者別サマリー</h2>
-            {headerControls}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-6 px-8 rounded-3xl shadow-xl text-white flex items-center justify-between">
+            <div><h2 className="text-2xl font-black">{latestFY ? `令和${latestFY - 2018 === 1 ? '元' : latestFY - 2018}年度 還元金サマリー` : '利用者別サマリー'}</h2></div>
+            <div className="flex items-center gap-4"><label className="text-xs font-bold uppercase opacity-80">対象期間</label>
+              <select value={summaryEndMonth} onChange={(e) => setSummaryEndMonth(e.target.value)} className="bg-white text-slate-900 rounded-xl px-4 py-2 text-sm outline-none border-none">
+                <option value="all">通年（すべて）</option>{months.map(m => <option key={m} value={m}>{m} まで</option>)}
+              </select>
+            </div>
           </div>
-          {renderUserSummaryList(filteredSummaries)}
+          <div className="flex justify-end mb-4"><button onClick={() => handlePrintAll(filteredSummaries)} className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg"><Printer className="w-5 h-5" />一括印刷</button></div>
+          <div className="space-y-3">{filteredSummaries.map(s => {
+            const exp = expandedUsers.has(s.利用者ID);
+            return (
+              <div key={s.利用者ID} className="bg-white/80 border rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <button onClick={() => toggleUserExpansion(s.利用者ID)} className="w-full px-6 py-5 flex items-center justify-between group">
+                  <div className="flex items-center gap-4"><Users className="w-5 h-5 text-blue-600" /><div><p className="font-bold text-lg">{s.氏名} 様</p><p className="text-[10px] text-slate-400">ID: {s.利用者ID}</p></div></div>
+                  <div className="flex items-center gap-6"><button onClick={e => { e.stopPropagation(); handlePrint(s); }} className="p-3 text-slate-400 hover:text-indigo-600 rounded-xl transition-colors"><Printer className="w-5 h-5" /></button>
+                  <div className="hidden lg:grid grid-cols-5 gap-4">
+                    <div className="text-right border-r px-4"><p className="text-[9px] text-slate-400">預り金</p><p className="text-sm font-bold text-blue-600">{s.年間預り金合計.toLocaleString()}</p></div>
+                    <div className="text-right border-r px-4"><p className="text-[9px] text-slate-400">支出</p><p className="text-sm font-bold text-orange-600">{s.年間支出合計.toLocaleString()}</p></div>
+                    <div className="text-right border-r px-4"><p className="text-[9px] text-slate-400">前年度繰越</p><p className="text-sm font-bold text-purple-600">{s.前年度繰越金.toLocaleString()}</p></div>
+                    <div className="text-right border-r px-4"><p className="text-[9px] text-slate-400">繰越金</p><p className="text-sm font-bold text-red-600">-{s.繰越金.toLocaleString()}</p></div>
+                    <div className="text-right px-4"><p className="text-[9px] text-slate-400">還元金</p><p className="text-lg font-black text-emerald-600">{s.最終還元金.toLocaleString()}</p></div>
+                  </div>{exp ? <ChevronUp className="w-5 h-5 text-slate-300" /> : <ChevronDown className="w-5 h-5 text-slate-300" />}</div>
+                </button>
+                {exp && <div className="p-6 bg-slate-50 border-t overflow-x-auto"><table className="min-w-full divide-y text-xs font-mono"><thead><tr><th>年月</th><th>預り金</th><th>家賃</th><th>賃補</th><th>光熱</th><th>朝食</th><th>昼食</th><th>夕食</th><th>修繕</th><th>日用</th><th>共益</th><th>管</th><th>保</th><th>食材</th><th>計</th></tr></thead><tbody className="divide-y">{s.月別データ.map((r: any, idx) => (<tr key={idx}><td>{r.年月}</td><td className="text-right">{r.月額預り金.toLocaleString()}</td><td className="text-right">{r.家賃.toLocaleString()}</td><td className="text-right">({r.家賃補助.toLocaleString()})</td><td className="text-right">{r.光熱費.toLocaleString()}</td><td className="text-right">{r.朝食費.toLocaleString()}</td><td className="text-right">{r.昼食費.toLocaleString()}</td><td className="text-right">{r.夕食費.toLocaleString()}</td><td className="text-right">{r.修繕積立.toLocaleString()}</td><td className="text-right">{r.日用品.toLocaleString()}</td><td className="text-right">{r.共益費.toLocaleString()}</td><td className="text-right">{r.金銭管理費.toLocaleString()}</td><td className="text-right">{r.火災保険.toLocaleString()}</td><td className="text-right">{r.食材費.toLocaleString()}</td><td className="text-right font-bold text-emerald-600">{r.当月還元金合計.toLocaleString()}</td></tr>))}</tbody></table></div>}
+              </div>
+            );
+          })}</div>
         </div>
       );
     }
-
-
-    const isRefundDetail = activeTab === 'refundDetail' && activeData.length > 0;
-    const calculatedData = isRefundDetail ? activeData as CalculatedRefund[] : [];
-
-    // Filter out complex objects like 'details' that cause React Error #31
-    const headers = activeData.length > 0
-      ? Object.keys(activeData[0]).filter(key => {
-        const val = (activeData[0] as any)[key];
-        return typeof val !== 'object' || val === null;
-      })
-      : [];
-
-    return (
-      <>
-        {isRefundDetail && calculatedData.length > 0 && (
-          <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">計算結果サマリー</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">対象者数</p>
-                <p className="text-2xl font-bold text-gray-900">{calculatedData.length}人</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総預り金</p>
-                <p className="text-2xl font-bold text-blue-600">
-                  {calculatedData.reduce((sum, r) => sum + r.月額預り金, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総支出</p>
-                <p className="text-2xl font-bold text-orange-600">
-                  {calculatedData.reduce((sum, r) => sum + (r.家賃 + r.家賃補助 + r.共益費 + r.日用品 + r.修繕積立 + r.食費合計 + r.光熱費 + r.金銭管理費 + r.火災保険 + r.食材費), 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-4 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-600 mb-1">総還元金</p>
-                <p className="text-2xl font-bold text-green-600">
-                  {calculatedData.reduce((sum, r) => sum + r.当月還元金合計, 0).toLocaleString()}円
-                </p>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 md:grid-cols-7 gap-2">
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">家賃合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.家賃, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">日用品合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.日用品, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">修繕積立合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.修繕積立, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">食費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.食費合計, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">光熱費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.光熱費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">管理費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.金銭管理費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">食材費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.食材費, 0).toLocaleString()}円
-                </p>
-              </div>
-              <div className="bg-white p-3 rounded shadow-sm">
-                <p className="text-xs text-gray-600">共益費合計</p>
-                <p className="text-sm font-semibold text-gray-900">
-                  {calculatedData.reduce((sum, r) => sum + r.共益費, 0).toLocaleString()}円
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                {headers.map((header: string) => (
-                  <th
-                    key={header}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider whitespace-nowrap"
-                  >
-                    {header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {activeData.map((row: any, idx: number) => (
-                <tr key={idx} className="hover:bg-gray-50">
-                  {headers.map((header: string) => (
-                    <td
-                      key={header}
-                      className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
-                    >
-                      {typeof row[header] === 'number'
-                        ? row[header].toLocaleString('ja-JP')
-                        : typeof row[header] === 'object' && row[header] !== null
-                          ? '[詳細]'
-                          : row[header] || '-'}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </>
-    );
+    const data = tabs.find(t => t.id === activeTab)?.data || [];
+    const heads = data.length > 0 ? Object.keys(data[0]).filter(k => typeof (data[0] as any)[k] !== 'object' || (data[0] as any)[k] === null) : [];
+    return (<div className="overflow-x-auto rounded-3xl border bg-white shadow-xl"><table className="min-w-full divide-y divide-slate-100"><thead><tr className="bg-slate-50">{heads.map(h => <th key={h} className="px-6 py-4 text-left text-[10px] font-black uppercase text-slate-400 tracking-widest">{h}</th>)}</tr></thead><tbody className="divide-y font-mono">{data.map((row: any, i) => (<tr key={i} className="hover:bg-blue-50 transition-colors">{heads.map(h => <td key={h} className="px-6 py-4 text-sm text-slate-600">{typeof row[h] === 'number' ? row[h].toLocaleString() : row[h] || '-'}</td>)}</tr>))}</tbody></table></div>);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 no-print">
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <FileSpreadsheet className="w-10 h-10 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">還元金計算ツール</h1>
+    <div className="min-h-screen bg-slate-50/50">
+      <div className="max-w-[1600px] mx-auto px-6 py-10 no-print">
+        <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div><div className="flex items-center gap-4 mb-2"><div className="bg-blue-600 p-2 rounded-xl text-white"><FileSpreadsheet /></div><h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-800">還元金計算ツール v2.5</h1></div><p className="text-slate-400 font-bold ml-1">Elderly Care Unit Refund Management</p></div>
+          <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-xl border flex gap-3 min-w-[400px]">
+            <input type="text" value={spreadsheetId} onChange={e => setSpreadsheetId(e.target.value)} placeholder="Spreadsheet ID..." className="flex-1 rounded-2xl bg-slate-50 px-4 py-3 border text-sm font-mono outline-none focus:ring-2 focus:ring-blue-100" />
+            <button onClick={loadAllData} disabled={loading} className="bg-slate-900 text-white px-6 rounded-2xl font-black hover:bg-black transition-all">Load</button>
           </div>
-          <p className="text-gray-600">
-            Google スプレッドシートから利用者データを読み込み、還元金を自動計算します
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            スプレッドシートID
-          </label>
-          <div className="flex gap-4">
-            <input
-              type="text"
-              value={spreadsheetId}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSpreadsheetId(e.target.value)}
-              placeholder="1X2Y3Z..."
-              className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2 border"
-            />
-            <button
-              onClick={loadAllData}
-              disabled={loading}
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <Download className="w-5 h-5" />
-              )}
-              データ読み込み
+        </header>
+        {error && <div className="mb-8 bg-rose-50 border-2 border-rose-100 rounded-3xl p-6 flex items-center gap-4 text-rose-900 font-bold"><AlertTriangle />{error}</div>}
+        {successMessage && <div className="mb-8 bg-emerald-50 border-2 border-emerald-100 rounded-3xl p-6 text-emerald-900 font-black">✓ {successMessage}</div>}
+        <div className="bg-white/60 backdrop-blur rounded-[40px] shadow-2xl border overflow-hidden mb-12">
+          <div className="px-8 border-b flex gap-2 overflow-x-auto no-scrollbar">{['unitManagement', 'mealInput', 'unitInput', 'unitMaster', 'unitUtilityCost', 'mealCount', 'refundDetail', 'userSummary'].map(id => (
+            <button key={id} onClick={() => setActiveTab(id)} className={`py-6 px-6 font-black text-sm transition-all relative ${activeTab === id ? 'text-blue-600' : 'text-slate-400'}`}>
+              {{ unitManagement: 'ユニット管理', mealInput: '食数入力', unitInput: 'ユニット入力', unitMaster: 'ユニットマスタ', unitUtilityCost: '光熱費', mealCount: '食数参照', refundDetail: '明細', userSummary: 'サマリー' }[id]}
+              {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-blue-500 rounded-t-full"></div>}
             </button>
+          ))}</div>
+          <div className="p-10">
+            {activeTab === 'refundDetail' && <div className="mb-10 flex gap-4"><button onClick={calculateRefunds} className="bg-slate-900 text-white px-10 py-5 rounded-3xl flex items-center gap-3 font-black text-lg shadow-xl"><Calculator />計算実行</button><button onClick={writeToSheet} className="bg-emerald-600 text-white px-10 rounded-3xl flex items-center gap-3 font-black text-lg shadow-xl"><Save />保存</button></div>}
+            {renderTable()}
           </div>
-          {error && (
-            <div className="mt-4 p-4 bg-red-50 text-red-700 rounded-md flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              {error}
-            </div>
-          )}
-          {successMessage && (
-            <div className="mt-4 p-4 bg-green-50 text-green-700 rounded-md">
-              {successMessage}
-            </div>
-          )}
         </div>
-
-        <div className="mb-4 flex flex-col gap-2">
-          <details className="text-sm text-gray-500 cursor-pointer p-2 border rounded hover:bg-gray-50">
-            <summary>🔍 データインスペクター (最初のレコード)</summary>
-            <div className="mt-2 space-y-4 p-2">
-              {unitManagement.length > 0 && (
-                <div>
-                  <p className="font-bold text-xs uppercase text-gray-700">ユニット管理 (UnitManagement)</p>
-                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(unitManagement[0], null, 2)}
-                  </pre>
-                </div>
-              )}
-              {mealCount.length > 0 && (
-                <div>
-                  <p className="font-bold text-xs uppercase text-gray-700">食数データ (MealCount)</p>
-                  <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-x-auto">
-                    {JSON.stringify(mealCount[0], null, 2)}
-                  </pre>
-                </div>
-              )}
-            </div>
-          </details>
+        <div className="grid grid-cols-2 gap-8 mb-20">
+          {unitChanges.length > 0 && <div className="bg-amber-50 p-8 rounded-[40px] border"><h3>移動検出</h3>{unitChanges.map((c, i) => <div key={i} className="mt-2 text-sm">{c.氏名}: {c.変更履歴.map(h => `${h.年月} ${h.変更前}→${h.変更後}`).join(', ')}</div>)}</div>}
+          {validationWarnings.length > 0 && <div className="bg-orange-50 p-8 rounded-[40px] border"><h3>データ品質警告</h3>{validationWarnings.map((w, i) => <div key={i} className="text-xs mt-1 text-slate-600">{w.message}</div>)}</div>}
         </div>
-
-
-        {unitManagement.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-            <div className="border-b border-gray-200">
-              <nav className="-mb-px flex overflow-x-auto">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors
-                      ${activeTab === tab.id
-                        ? 'border-blue-500 text-blue-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}
-                    `}
-                  >
-                    {tab.label}
-                    {tab.data.length > 0 && (
-                      <span className={`ml-2 py-0.5 px-2 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                        {tab.data.length}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </nav>
-            </div>
-
-            <div className="p-6">
-              {activeTab === 'refundDetail' && (
-                <div className="mb-6 flex gap-4">
-                  <button
-                    onClick={calculateRefunds}
-                    className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 flex items-center gap-2 shadow-sm transition-colors"
-                  >
-                    <Calculator className="w-5 h-5" />
-                    還元金計算を実行
-                  </button>
-                  {refundDetail.length > 0 && (
-                    <button
-                      onClick={writeToSheet}
-                      disabled={loading}
-                      className="bg-green-600 text-white px-6 py-3 rounded-md hover:bg-green-700 flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      {loading ? (
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      ) : (
-                        <Save className="w-5 h-5" />
-                      )}
-                      スプレッドシートへ書き込み
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {renderTable()}
-            </div>
-          </div>
-        )}
-
-        {unitChanges.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-yellow-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              ユニット移動の検出
-            </h3>
-            <div className="space-y-4">
-              {unitChanges.map((change, idx) => (
-                <div key={idx} className="bg-white p-4 rounded border border-yellow-100">
-                  <p className="font-bold text-gray-900">{change.氏名} ({change.利用者ID})</p>
-                  <ul className="mt-2 space-y-1">
-                    {change.変更履歴.map((hist, hIdx) => (
-                      <li key={hIdx} className="text-sm text-gray-600 ml-4 list-disc">
-                        {hist.年月}: {hist.変更前} → <span className="font-bold text-yellow-700">{hist.変更後}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {validationWarnings.length > 0 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-bold text-orange-800 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
-              データ不足の警告
-            </h3>
-            <div className="max-h-60 overflow-y-auto space-y-2">
-              {validationWarnings.map((warning, idx) => (
-                <div key={idx} className="flex gap-2 text-sm text-orange-700">
-                  <span className="font-bold min-w-[120px]">
-                    {warning.type === 'missing_month' ? '月データ不足' :
-                      warning.type === 'missing_utility' ? '光熱費未登録' : '食数未登録'}
-                  </span>
-                  <span>{warning.message}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* 印刷用レイアウト (非表示、印刷時のみ表示) */}
-      {printingUser && (
-        <div className="print-only print-content">
-          <div className="mb-6">
-            <h1 className="print-title text-2xl font-bold">{printingUser.氏名} 様 還元金明細書 (年間)</h1>
-            <p className="text-sm font-semibold mt-1 p-1 bg-gray-100 inline-block rounded">還元金明細書</p>
+      <div className="print-only">
+        {printingUsers.length > 0 && printingUsers.map((user, uIdx) => (
+          <div key={user.利用者ID} className={`print-page ${uIdx < printingUsers.length - 1 ? 'page-break' : ''}`}>
+             <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+                <div><h1 className="text-3xl font-black">還元金明細書</h1><p className="text-[10px] text-slate-400 mt-1">Smart Statement System</p></div>
+                <div className="text-right"><p className="text-[10px] text-slate-400 uppercase">作成日: {new Date().toLocaleDateString('ja-JP')}</p><h2 className="text-2xl font-black">{user.氏名} 様</h2></div>
+             </div>
+             <p className="text-xs mb-4 font-bold">対象期間: {user.月別データ[0]?.年月} 〜 {user.月別データ[user.月別データ.length - 1]?.年月}</p>
+             <table className="w-full border-collapse border-black border-2 text-[10px]">
+               <thead><tr className="bg-slate-100"><th className="border border-black p-1">年月</th><th className="border border-black p-1">預り金</th><th className="border border-black p-1">家賃</th><th className="border border-black p-1">賃補</th><th className="border border-black p-1">共益費</th><th className="border border-black p-1">光熱費</th><th className="border border-black p-1">食費計</th><th className="border border-black p-1">日用品</th><th className="border border-black p-1">修繕</th><th className="border border-black p-1">金管</th><th className="border border-black p-1">保険</th><th className="border border-black p-1">食材</th><th className="border border-black p-1 font-black">当月計</th></tr></thead>
+               <tbody>{user.月別データ.map((r, i) => (<tr key={i}><td className="border border-black p-1 text-center">{r.年月}</td><td className="border border-black p-1 text-right">{r.月額預り金.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.家賃.toLocaleString()}</td><td className="border border-black p-1 text-right text-[8px]">({r.家賃補助.toLocaleString()})</td><td className="border border-black p-1 text-right">{r.共益費.toLocaleString()}</td><td className="border border-black p-1 text-right font-bold">{r.光熱費.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.食費合計.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.日用品.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.修繕積立.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.金銭管理費.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.火災保険.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.食材費.toLocaleString()}</td><td className="border border-black p-1 text-right font-black bg-slate-50">{r.当月還元金合計.toLocaleString()}</td></tr>))}</tbody>
+               <tfoot><tr className="bg-slate-200 font-black"><td className="border border-black p-1 text-center">合計</td><td className="border border-black p-1 text-right">{user.年間預り金合計.toLocaleString()}</td><td className="border border-black p-1" colSpan={10}></td><td className="border border-black p-1 text-right">{user.年間還元金合計.toLocaleString()}</td></tr></tfoot>
+             </table>
+             <div className="mt-8 flex justify-between gap-10">
+               <div className="w-1/2 border-2 border-black p-4 rounded-xl h-24 relative"><p className="text-[10px] text-slate-300 absolute top-1 left-2 uppercase">Notes</p></div>
+               <div className="w-2/5 space-y-1 font-bold text-xs">
+                 <div className="flex justify-between border-b py-0.5"><span>年間預り金</span><span>{user.年間預り金合計.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between border-b py-0.5"><span>年間支出計</span><span>{user.年間支出合計.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between border-b py-0.5"><span>年間還元計</span><span>{user.年間還元金合計.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between pt-1"><span>前年度繰越</span><span>{user.前年度繰越金.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between border-b-2 border-black text-rose-600"><span>繰越金</span><span>-{user.繰越金.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between text-lg font-black pt-2 border-b-4 border-double border-black uppercase"><span>Final Refund</span><span>{user.最終還元金.toLocaleString()} 円</span></div>
+               </div>
+             </div>
           </div>
-
-
-          <table className="w-full text-[10px] border-collapse">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border p-1">年月</th>
-                <th className="border p-1">預り金</th>
-                <th className="border p-1">家賃</th>
-                <th className="border p-1">家賃補助</th>
-                <th className="border p-1">共益費</th>
-                <th className="border p-1">光熱費</th>
-                <th className="border p-1">食費合計</th>
-                <th className="border p-1">日用品</th>
-                <th className="border p-1">修繕積立</th>
-                <th className="border p-1">管理費</th>
-                <th className="border p-1">保険料</th>
-                <th className="border p-1">食材費</th>
-                <th className="border p-1">還元金</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printingUser.月別データ.map((r, idx) => (
-                <tr key={idx}>
-                  <td className="border p-1 text-center">{r.年月}</td>
-                  <td className="border p-1 text-right">{r.月額預り金.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.家賃.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.家賃補助.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.共益費.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.光熱費.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.食費合計.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.日用品.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.修繕積立.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.金銭管理費.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.火災保険.toLocaleString()}</td>
-                  <td className="border p-1 text-right">{r.食材費.toLocaleString()}</td>
-                  <td className="border p-1 text-right font-bold">{r.当月還元金合計.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 font-bold">
-                <td className="border p-1 text-center">合計</td>
-                <td className="border p-1 text-right">{printingUser.年間預り金合計.toLocaleString()}</td>
-                <td className="border p-1 text-right colspan-11">
-                  {/* Summary spans across other columns visually in paper if needed, but for simplicity: */}
-                </td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right"></td>
-                <td className="border p-1 text-right">{printingUser.年間還元金合計.toLocaleString()}</td>
-              </tr>
-            </tfoot>
-          </table>
-
-          <div className="mt-8 flex justify-end gap-12 text-sm">
-            <div className="text-right">
-              <p>年間預り金合計: {printingUser.年間預り金合計.toLocaleString()} 円</p>
-              <p>年間支出合計: {printingUser.年間支出合計.toLocaleString()} 円</p>
-              <p className="font-bold mt-2">
-                年間還元金合計: {printingUser.年間還元金合計.toLocaleString()} 円
-              </p>
-              <p className="text-purple-700 mt-2">
-                前年度繰越金: {printingUser.前年度繰越金.toLocaleString()} 円
-              </p>
-              <p className="text-red-700">
-                繰越金: -{printingUser.繰越金.toLocaleString()} 円
-              </p>
-              <p className="text-lg font-bold border-t-2 border-black mt-2 pt-1 text-green-700">
-                最終還元金: {printingUser.最終還元金.toLocaleString()} 円
-              </p>
-            </div>
-          </div>
-        </div>
-      )
-      }
-    </div >
+        ))}
+      </div>
+    </div>
   );
 }

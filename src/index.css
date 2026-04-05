@@ -2,15 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply text-slate-900;
+  }
+}
+
 @media print {
   @page {
-    size: A4;
-    margin: 0;
+    size: A4 landscape;
+    margin: 10mm;
   }
 
   body {
     background: white !important;
-    padding: 10mm !important;
+    padding: 0 !important;
+    font-family: "MS Mincho", "Hiragino Mincho ProN", serif;
   }
 
   .no-print {
@@ -19,43 +26,84 @@
 
   .print-only {
     display: block !important;
-    position: absolute;
-    top: 0;
-    left: 0;
+  }
+
+  .print-page {
     width: 100%;
-    height: 100%;
-    z-index: 9999;
+    margin: 0 auto;
+    padding: 5mm;
     background: white;
+    min-height: 180mm;
+    position: relative;
+    color: black !important;
   }
 
-  .print-content {
+  .page-break {
+    page-break-after: always;
+  }
+
+  .print-main-title {
+    font-size: 24pt !important;
+    font-weight: 800 !important;
+    letter-spacing: 0.1em;
+    text-align: center;
+    border-bottom: 3px double #000;
+    padding-bottom: 5mm;
+    margin-bottom: 8mm;
+  }
+
+  .print-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 8mm;
+  }
+
+  .print-table {
     width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-
-  table {
     border-collapse: collapse !important;
-    width: 100% !important;
+    border: 2px solid #000 !important;
+    margin-bottom: 5mm;
   }
 
-  th,
-  td {
-    border: 1px solid #ddd !important;
-    padding: 4px 8px !important;
-    font-size: 10pt !important;
+  .print-table th,
+  .print-table td {
+    border: 1px solid #000 !important;
+    padding: 2px 4px !important;
+    font-size: 9pt !important;
   }
 
-  .print-title {
-    font-size: 18pt !important;
-    font-weight: bold !important;
-    margin-bottom: 20px !important;
-    text-align: center !important;
+  .print-table th {
+    background-color: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Force white background for all table cells in print if browser tries to add color */
+  .print-table td {
+    background-color: white !important;
+  }
+
+  .print-table td.bg-gray-50,
+  .print-table tr.bg-gray-50 {
+    background-color: white !important;
   }
 }
 
 .print-only {
   display: none;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
