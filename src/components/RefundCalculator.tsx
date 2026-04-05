@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FileSpreadsheet, Calculator, Download, Save, AlertTriangle, ChevronDown, ChevronUp, Users, Printer } from 'lucide-react';
 import {
   UnitManagement,
@@ -86,6 +86,7 @@ export default function RefundCalculator() {
   const [userSummaries, setUserSummaries] = useState<UserSummary[]>([]);
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   const [printingUser, setPrintingUser] = useState<UserSummary | null>(null);
+  const [summaryEndMonth, setSummaryEndMonth] = useState<string>('all');
 
   const normalizeStatus = (s: string) => (s || '').trim().replace(/[\s\u3000]/g, '');
 
@@ -282,7 +283,8 @@ export default function RefundCalculator() {
         let carryover = carryoverBalances.find(c => String(c.利用者ID).trim() === targetId);
 
         if (!carryover) {
-          const nameMatch = carryoverBalances.find(c => c.氏名 === refund.氏名);
+          const normalize = (s: string) => (s || '').replace(/\s|　/g, '');
+          const nameMatch = carryoverBalances.find(c => normalize(c.氏名) === normalize(refund.氏名));
           if (nameMatch) {
             console.warn(`⚠️ Using name fallback for ${refund.氏名}: from ID="${refund.利用者ID}" to "${nameMatch.利用者ID}"`);
             carryover = nameMatch;
@@ -355,6 +357,44 @@ export default function RefundCalculator() {
       setUserSummaries(summaries);
     }
   }, [refundDetail, carryoverBalances]);
+
+  const filteredSummaries = useMemo(() => {
+    if (summaryEndMonth === 'all') return userSummaries;
+
+    const allMonths = Array.from(new Set(userSummaries.flatMap(s => s.月別データ.map(m => m.年月)))).sort(sortByFiscalYear as any);
+    const endIndex = allMonths.indexOf(summaryEndMonth);
+    
+    if (endIndex === -1) return userSummaries;
+
+    const targetMonths = new Set(allMonths.slice(0, endIndex + 1));
+
+    return userSummaries.map(user => {
+      const filteredData = user.月別データ.filter(m => targetMonths.has(m.年月));
+      
+      let 年間預り金合計 = 0;
+      let 年間支出合計 = 0;
+      let 年間還元金合計 = 0;
+
+      filteredData.forEach(r => {
+        年間預り金合計 += r.月額預り金 || 0;
+        年間支出合計 += (r.家賃 || 0) + (r.家賃補助 || 0) + (r.共益費 || 0) + 
+                      (r.日用品 || 0) + (r.修繕積立 || 0) + (r.食費合計 || 0) + 
+                      (r.光熱費 || 0) + (r.金銭管理費 || 0) + (r.火災保険 || 0) + (r.食材費 || 0);
+        年間還元金合計 += r.当月還元金合計 || 0;
+      });
+
+      const 最終還元金 = 年間還元金合計 + user.前年度繰越金 - user.繰越金;
+
+      return {
+        ...user,
+        年間預り金合計,
+        年間支出合計,
+        年間還元金合計,
+        最終還元金,
+        月別データ: filteredData
+      };
+    });
+  }, [userSummaries, summaryEndMonth]);
 
   const loadAllData = async () => {
     if (!spreadsheetId.trim()) {
@@ -1342,6 +1382,26 @@ export default function RefundCalculator() {
                         {summary.月別データ.map((month, idx) => {
                           // Cast to CalculatedRefund to access new fields
                           const r = month as CalculatedRefund;
+                          
+                          // 再計算済みの場合はdetailsを使用、そうでない場合はキャッシュされたデータから補完
+                          const matchMeal = r.calculated ? null : mealCount.find(m => m.利用者ID === r.利用者ID && m.月 === r.年月);
+                          const matchUnit = r.calculated ? null : unitManagement.find(u => u.利用者ID === r.利用者ID && u.年月 === r.年月);
+
+                          const bCount = r.details?.breakfast.count ?? matchMeal?.朝食 ?? 0;
+                          const bPrice = r.details?.breakfast.unitPrice ?? matchUnit?.朝食費 ?? 0;
+                          const bTotal = r.calculated ? r.朝食費 : (bCount * bPrice);
+
+                          const lCount = r.details?.lunch.count ?? matchMeal?.昼食 ?? 0;
+                          const lPrice = r.details?.lunch.unitPrice ?? matchUnit?.昼食費 ?? 0;
+                          const lTotal = r.calculated ? r.昼食費 : (lCount * lPrice);
+
+                          const dCount = r.details?.dinner.count ?? matchMeal?.夕食 ?? 0;
+                          const dPrice = r.details?.dinner.unitPrice ?? matchUnit?.夕食費 ?? 0;
+                          const eCount = r.details?.event.count ?? matchMeal?.行事食 ?? 0;
+                          const ePrice = r.details?.event.unitPrice ?? matchUnit?.行事食 ?? 0;
+                          const eTotal = r.details?.event.total ?? (eCount * ePrice);
+                          const dTotal = r.calculated ? r.夕食費 : (dCount * dPrice + eTotal);
+
                           return (
                             <tr key={idx} className="hover:bg-gray-50">
                               <td className="px-4 py-2 text-gray-900">{r.年月}</td>
@@ -1359,27 +1419,27 @@ export default function RefundCalculator() {
                                 {r.光熱費.toLocaleString()}
                               </td>
                               <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{r.朝食費.toLocaleString()}</div>
-                                {r.details && (
+                                <div className="font-medium">{bTotal.toLocaleString()}</div>
+                                {(bCount > 0 || r.details) && (
                                   <div className="text-[10px] text-gray-500">
-                                    @{r.details.breakfast.unitPrice}×{r.details.breakfast.count}
+                                    @{bPrice}×{bCount}
                                   </div>
                                 )}
                               </td>
                               <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{r.昼食費.toLocaleString()}</div>
-                                {r.details && (
+                                <div className="font-medium">{lTotal.toLocaleString()}</div>
+                                {(lCount > 0 || r.details) && (
                                   <div className="text-[10px] text-gray-500">
-                                    @{r.details.lunch.unitPrice}×{r.details.lunch.count}
+                                    @{lPrice}×{lCount}
                                   </div>
                                 )}
                               </td>
                               <td className="px-4 py-2 text-right text-gray-900">
-                                <div className="font-medium">{r.夕食費.toLocaleString()}</div>
-                                {r.details && (
+                                <div className="font-medium">{dTotal.toLocaleString()}</div>
+                                {(dCount > 0 || eCount > 0 || r.details) && (
                                   <div className="text-[10px] text-gray-500">
-                                    @{r.details.dinner.unitPrice}×{r.details.dinner.count}
-                                    {r.details.event.total > 0 && ` +行事${r.details.event.total}`}
+                                    @{dPrice}×{dCount}
+                                    {eTotal > 0 && ` +行事${eTotal}`}
                                   </div>
                                 )}
                               </td>
@@ -1457,25 +1517,52 @@ export default function RefundCalculator() {
       const fiscalYears = Array.from(new Set(months.map(m => getFiscalYear(m))));
       const latestFY = fiscalYears.length > 0 ? Math.max(...fiscalYears) : null;
 
+      const headerControls = (
+        <div className="flex items-center gap-4 text-black">
+          <label className="text-sm font-medium text-white opacity-90">対象期間:</label>
+          <select
+            value={summaryEndMonth}
+            onChange={(e) => setSummaryEndMonth(e.target.value)}
+            className="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 text-sm px-3 py-1 outline-none"
+          >
+            <option value="all">通年（すべて）</option>
+            {months.map(m => (
+              <option key={m} value={m}>{m} まで表示</option>
+            ))}
+          </select>
+        </div>
+      );
+
       if (latestFY) {
         const reiwaYear = latestFY - 2018;
         const reiwaText = reiwaYear === 1 ? '元' : String(reiwaYear);
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
-              <h2 className="text-2xl font-bold tracking-tight">
-                令和{reiwaText}年度（推計）
-              </h2>
-              <span className="text-sm opacity-90 border border-white/30 px-3 py-1 rounded-full">
-                {latestFY}年4月 〜 {latestFY + 1}年3月
-              </span>
+              <div>
+                <h2 className="text-2xl font-bold tracking-tight">
+                  令和{reiwaText}年度（推計）
+                </h2>
+                <div className="text-sm opacity-90 mt-1">
+                  {latestFY}年4月 〜 {latestFY + 1}年3月
+                </div>
+              </div>
+              {headerControls}
             </div>
-            {renderUserSummaryList(userSummaries)}
+            {renderUserSummaryList(filteredSummaries)}
           </div>
         );
       }
 
-      return renderUserSummaryList(userSummaries);
+      return (
+        <div className="space-y-6">
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-700 py-4 px-6 rounded-lg shadow-md mb-4 flex items-center justify-between text-white">
+            <h2 className="text-xl font-bold tracking-tight">利用者別サマリー</h2>
+            {headerControls}
+          </div>
+          {renderUserSummaryList(filteredSummaries)}
+        </div>
+      );
     }
 
 
