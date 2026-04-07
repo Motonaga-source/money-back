@@ -11,7 +11,7 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 15mm; /* Give some margin for content while hiding browser headers/footers */
+    margin: 0; /* Set margin to 0 to hide browser headers/footers (URL, title, etc.) */
   }
 
   /* Hide default browser header and footer */
@@ -39,9 +39,10 @@
   .print-page {
     width: 100%;
     margin: 0 auto;
-    padding: 5mm;
+    padding: 15mm; /* Add padding here instead of page margin */
     background: white;
-    min-height: 180mm;
+    box-sizing: border-box;
+    min-height: 210mm; /* A4 landscape height approximately */
     position: relative;
     color: black !important;
   }

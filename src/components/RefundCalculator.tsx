@@ -547,17 +547,17 @@ export default function RefundCalculator() {
       <div className="print-only">
         {printingUsers.length > 0 && printingUsers.map((user, uIdx) => (
           <div key={user.利用者ID} className={`print-page ${uIdx < printingUsers.length - 1 ? 'page-break' : ''}`}>
-             <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
+             <div className="flex justify-between items-end border-b-2 border-black pb-2 mb-4">
                 <div><h1 className="text-3xl font-black">還元金明細書</h1></div>
                 <div className="text-right"><p className="text-[10px] text-slate-400 uppercase">作成日: {new Date().toLocaleDateString('ja-JP')}</p><h2 className="text-2xl font-black">{user.氏名} 様</h2></div>
              </div>
              <p className="text-xs mb-4 font-bold">対象期間: {user.月別データ[0]?.年月} 〜 {user.月別データ[user.月別データ.length - 1]?.年月}</p>
-             <table className="w-full border-collapse border-black border-2 text-[10px]">
+             <table className="w-full border-collapse border-black border-2 text-[9px]">
                <thead><tr className="bg-slate-100"><th className="border border-black p-1">年月</th><th className="border border-black p-1">預り金</th><th className="border border-black p-1">家賃</th><th className="border border-black p-1">賃補</th><th className="border border-black p-1">共益費</th><th className="border border-black p-1">光熱費</th><th className="border border-black p-1">食費計</th><th className="border border-black p-1">日用品</th><th className="border border-black p-1">修繕</th><th className="border border-black p-1">金管</th><th className="border border-black p-1">保険</th><th className="border border-black p-1">食材</th><th className="border border-black p-1 font-black">当月計</th></tr></thead>
                <tbody>{user.月別データ.map((r, i) => (<tr key={i}><td className="border border-black p-1 text-center">{r.年月}</td><td className="border border-black p-1 text-right">{r.月額預り金.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.家賃.toLocaleString()}</td><td className="border border-black p-1 text-right text-[8px]">({r.家賃補助.toLocaleString()})</td><td className="border border-black p-1 text-right">{r.共益費.toLocaleString()}</td><td className="border border-black p-1 text-right font-bold">{r.光熱費.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.食費合計.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.日用品.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.修繕積立.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.金銭管理費.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.火災保険.toLocaleString()}</td><td className="border border-black p-1 text-right">{r.食材費.toLocaleString()}</td><td className="border border-black p-1 text-right font-black bg-slate-50">{r.当月還元金合計.toLocaleString()}</td></tr>))}</tbody>
                <tfoot><tr className="bg-slate-200 font-black"><td className="border border-black p-1 text-center">合計</td><td className="border border-black p-1 text-right">{user.年間預り金合計.toLocaleString()}</td><td className="border border-black p-1" colSpan={10}></td><td className="border border-black p-1 text-right">{user.年間還元金合計.toLocaleString()}</td></tr></tfoot>
              </table>
-             <div className="mt-8 flex justify-between gap-10">
+             <div className="mt-4 flex justify-between gap-10">
                <div className="w-1/2 border-2 border-black p-4 rounded-xl h-24 relative"><p className="text-[10px] text-slate-300 absolute top-1 left-2 uppercase">Notes</p></div>
                <div className="w-2/5 space-y-1 font-bold text-xs">
                  <div className="flex justify-between border-b py-0.5"><span>年間預り金</span><span>{user.年間預り金合計.toLocaleString()} 円</span></div>
@@ -568,7 +568,7 @@ export default function RefundCalculator() {
                  <div className="flex justify-between text-lg font-black pt-2 border-b-4 border-double border-black uppercase"><span>還元金　合計</span><span>{user.最終還元金.toLocaleString()} 円</span></div>
                </div>
              </div>
-             <div className="mt-4 text-right">
+             <div className="mt-2 text-right">
                <p className="text-[10px] font-bold">発行元：特定非営利活動法人ビハーラ２１</p>
              </div>
           </div>
