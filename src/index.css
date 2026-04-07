@@ -11,7 +11,13 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 10mm;
+    margin: 15mm; /* Give some margin for content while hiding browser headers/footers */
+  }
+
+  /* Hide default browser header and footer */
+  html, body {
+    margin: 0;
+    padding: 0;
   }
 
   body {
@@ -20,7 +26,9 @@
     font-family: "MS Mincho", "Hiragino Mincho ProN", serif;
   }
 
-  .no-print {
+  .no-print,
+  title,
+  header {
     display: none !important;
   }
 

@@ -518,7 +518,7 @@ export default function RefundCalculator() {
   return (
     <div className="min-h-screen bg-slate-50/50">
       <div className="max-w-[1600px] mx-auto px-6 py-10 no-print">
-        <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6 no-print">
           <div><div className="flex items-center gap-4 mb-2"><div className="bg-blue-600 p-2 rounded-xl text-white"><FileSpreadsheet /></div><h1 className="text-3xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-800">還元金計算ツール v2.5</h1></div><p className="text-slate-400 font-bold ml-1">Elderly Care Unit Refund Management</p></div>
           <div className="bg-white/80 backdrop-blur rounded-3xl p-6 shadow-xl border flex gap-3 min-w-[400px]">
             <input type="text" value={spreadsheetId} onChange={e => setSpreadsheetId(e.target.value)} placeholder="Spreadsheet ID..." className="flex-1 rounded-2xl bg-slate-50 px-4 py-3 border text-sm font-mono outline-none focus:ring-2 focus:ring-blue-100" />
@@ -548,7 +548,7 @@ export default function RefundCalculator() {
         {printingUsers.length > 0 && printingUsers.map((user, uIdx) => (
           <div key={user.利用者ID} className={`print-page ${uIdx < printingUsers.length - 1 ? 'page-break' : ''}`}>
              <div className="flex justify-between items-end border-b-2 border-black pb-4 mb-6">
-                <div><h1 className="text-3xl font-black">還元金明細書</h1><p className="text-[10px] text-slate-400 mt-1">Smart Statement System</p></div>
+                <div><h1 className="text-3xl font-black">還元金明細書</h1></div>
                 <div className="text-right"><p className="text-[10px] text-slate-400 uppercase">作成日: {new Date().toLocaleDateString('ja-JP')}</p><h2 className="text-2xl font-black">{user.氏名} 様</h2></div>
              </div>
              <p className="text-xs mb-4 font-bold">対象期間: {user.月別データ[0]?.年月} 〜 {user.月別データ[user.月別データ.length - 1]?.年月}</p>
@@ -565,8 +565,11 @@ export default function RefundCalculator() {
                  <div className="flex justify-between border-b py-0.5"><span>年間還元計</span><span>{user.年間還元金合計.toLocaleString()} 円</span></div>
                  <div className="flex justify-between pt-1"><span>前年度繰越</span><span>{user.前年度繰越金.toLocaleString()} 円</span></div>
                  <div className="flex justify-between border-b-2 border-black text-rose-600"><span>繰越金</span><span>-{user.繰越金.toLocaleString()} 円</span></div>
-                 <div className="flex justify-between text-lg font-black pt-2 border-b-4 border-double border-black uppercase"><span>Final Refund</span><span>{user.最終還元金.toLocaleString()} 円</span></div>
+                 <div className="flex justify-between text-lg font-black pt-2 border-b-4 border-double border-black uppercase"><span>還元金　合計</span><span>{user.最終還元金.toLocaleString()} 円</span></div>
                </div>
+             </div>
+             <div className="mt-4 text-right">
+               <p className="text-[10px] font-bold">発行元：特定非営利活動法人ビハーラ２１</p>
              </div>
           </div>
         ))}
