@@ -398,6 +398,69 @@ export async function writeRefundDetail(
   }
 }
 
+export async function writeUnitUtilityCost(
+  _spreadsheetId: string, // Not used - configured in Cloudflare environment
+  utilityCosts: UnitUtilityCost[]
+): Promise<{ success: boolean; updatedRows: number }> {
+  const config = SHEET_CONFIGS.unitUtilityCost;
+
+  console.log(`📝 Writing ${utilityCosts.length} utility cost records to ${config.name}...`);
+
+  const data = utilityCosts.map((cost) => [
+    cost.年月,
+    cost.ユニット名,
+    cost.電気代,
+    cost.ガス代,
+    cost.水道代,
+    cost.サブ,
+    cost.合計,
+  ]);
+
+  console.log('First row to write:', data[0]);
+
+  try {
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        sheetName: config.name,
+        spreadsheetId: _spreadsheetId,
+        data,
+      }),
+    });
+
+    if (!response.ok) {
+      const contentType = response.headers.get('content-type');
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+
+      if (contentType?.includes('application/json')) {
+        const error = await response.json();
+        console.error(`❌ Error writing to ${config.name}:`, error);
+        errorMessage = error.error || error.message || errorMessage;
+      } else {
+        const text = await response.text();
+        console.error(`❌ Non-JSON error response for ${config.name}:`, text.substring(0, 200));
+        errorMessage = `Server returned HTML instead of JSON. This usually means the API endpoint is not configured correctly.`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const result = await response.json();
+    console.log(`✅ Successfully wrote ${result.updatedRows} rows to ${config.name}`);
+
+    return {
+      success: result.success,
+      updatedRows: result.updatedRows,
+    };
+  } catch (error) {
+    console.error(`❌ Failed to write to ${config.name}:`, error);
+    throw error;
+  }
+}
+
 export async function writeMealCount(
   _spreadsheetId: string, // Not used - configured in Cloudflare environment
   meals: MealCount[]

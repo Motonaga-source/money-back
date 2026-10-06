@@ -18,6 +18,7 @@ import {
   writeRefundDetail,
   writeMealCount,
   writeUnitManagement,
+  writeUnitUtilityCost,
 } from '../services/sheetsService';
 
 interface CalculationDetail {
@@ -355,19 +356,22 @@ export default function RefundCalculator() {
     } catch (err: any) { setError(`書き込み失敗: ${err.message}`); } finally { setLoading(false); }
   };
 
-  // --- Meal & Unit Input Logic ---
+  // --- Meal, Unit, Utility Input Logic ---
   const [mealInputMonth, setMealInputMonth] = useState('');
   const [pendingMealChanges, setPendingMealChanges] = useState<Record<string, MealCount>>({});
   const [unitInputMonth, setUnitInputMonth] = useState('');
   const [pendingUnitChanges, setPendingUnitChanges] = useState<Record<string, UnitManagement>>({});
+  const [utilityInputMonth, setUtilityInputMonth] = useState('');
+  const [pendingUtilityChanges, setPendingUtilityChanges] = useState<Record<string, UnitUtilityCost>>({});
 
   useEffect(() => {
-    if ((activeTab === 'mealInput' || activeTab === 'unitInput') && unitManagement.length > 0) {
+    if ((activeTab === 'mealInput' || activeTab === 'unitInput' || activeTab === 'utilityInput') && unitManagement.length > 0) {
       const months = Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any);
       if (months.length > 0) {
         const latest = months[months.length - 1];
         if (activeTab === 'mealInput' && !mealInputMonth) setMealInputMonth(latest);
         else if (activeTab === 'unitInput' && !unitInputMonth) setUnitInputMonth(latest);
+        else if (activeTab === 'utilityInput' && !utilityInputMonth) setUtilityInputMonth(latest);
       }
     }
   }, [activeTab, unitManagement]);
@@ -406,6 +410,32 @@ export default function RefundCalculator() {
         const final = Array.from(unitMap.values());
         await writeUnitManagement(spreadsheetId, final);
         setUnitManagement(final); setPendingUnitChanges({}); setSuccessMessage(`✅ 保存しました`);
+      }
+    } catch (err: any) { setError(err.message); } finally { setLoading(false); }
+  };
+
+  const handleUtilityInputChange = (unitName: string, field: keyof UnitUtilityCost, value: any) => {
+    setPendingUtilityChanges(prev => {
+      const current = prev[unitName] || unitUtilityCost.find(u => u.ユニット名 === unitName && u.年月 === utilityInputMonth) || { 年月: utilityInputMonth, ユニット名: unitName, 電気代: 0, ガス代: 0, 水道代: 0, サブ: 0, 合計: 0 };
+      const updated = { ...current, [field]: value };
+      if (['電気代', 'ガス代', '水道代', 'サブ'].includes(field)) {
+        updated.合計 = (updated.電気代 || 0) + (updated.ガス代 || 0) + (updated.水道代 || 0) + (updated.サブ || 0);
+      }
+      return { ...prev, [unitName]: updated };
+    });
+  };
+  const getUtilityValue = (unitName: string) => pendingUtilityChanges[unitName] || unitUtilityCost.find(u => u.ユニット名 === unitName && u.年月 === utilityInputMonth) || { 年月: utilityInputMonth, ユニット名: unitName, 電気代: 0, ガス代: 0, 水道代: 0, サブ: 0, 合計: 0 };
+
+  const saveUtilityCosts = async () => {
+    if (!utilityInputMonth) return;
+    setLoading(true); try {
+      const updates = Object.values(pendingUtilityChanges).filter(u => u.年月 === utilityInputMonth);
+      if (updates.length) {
+        const utilityMap = new Map(unitUtilityCost.map(u => [`${u.年月}_${u.ユニット名}`, u]));
+        updates.forEach(u => utilityMap.set(`${u.年月}_${u.ユニット名}`, u));
+        const final = Array.from(utilityMap.values());
+        await writeUnitUtilityCost(spreadsheetId, final);
+        setUnitUtilityCost(final); setPendingUtilityChanges({}); setSuccessMessage(`✅ 保存しました`);
       }
     } catch (err: any) { setError(err.message); } finally { setLoading(false); }
   };
@@ -463,6 +493,31 @@ export default function RefundCalculator() {
     );
   };
 
+  const renderUtilityInput = () => {
+    const activeUnits = unitMaster.sort((a, b) => a.ユニット名.localeCompare(b.ユニット名));
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-4 rounded-lg shadow-sm border flex items-center justify-between">
+          <select value={utilityInputMonth} onChange={(e) => { setUtilityInputMonth(e.target.value); setPendingUtilityChanges({}); }} className="block w-40 rounded-md border-gray-300 shadow-sm p-2 border">
+            {Array.from(new Set(unitManagement.map(u => u.年月))).sort(sortByFiscalYear as any).map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+          <button onClick={saveUtilityCosts} disabled={!Object.keys(pendingUtilityChanges).length || loading} className="px-4 py-2 bg-indigo-600 text-white rounded-md shadow-sm disabled:bg-gray-400">保存する</button>
+        </div>
+        <div className="bg-white shadow border sm:rounded-lg overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs">ユニット名</th><th className="px-4 py-3 text-center">電気代</th><th className="px-4 py-3 text-center">ガス代</th><th className="px-4 py-3 text-center">水道代</th><th className="px-4 py-3 text-center">サブ</th><th className="px-4 py-3 text-center">合計</th></tr></thead>
+            <tbody className="bg-white divide-y divide-gray-200">{activeUnits.map(unit => { const uData = getUtilityValue(unit.ユニット名); return (<tr key={unit.ユニット名} className="hover:bg-gray-50"><td className="px-6 py-4 font-bold">{unit.ユニット名}</td>
+              <td className="px-2 py-4 text-center"><input type="number" className="w-24 text-center border p-1" value={uData.電気代} onChange={e => handleUtilityInputChange(unit.ユニット名, '電気代', Number(e.target.value))} /></td>
+              <td className="px-2 py-4 text-center"><input type="number" className="w-24 text-center border p-1" value={uData.ガス代} onChange={e => handleUtilityInputChange(unit.ユニット名, 'ガス代', Number(e.target.value))} /></td>
+              <td className="px-2 py-4 text-center"><input type="number" className="w-24 text-center border p-1" value={uData.水道代} onChange={e => handleUtilityInputChange(unit.ユニット名, '水道代', Number(e.target.value))} /></td>
+              <td className="px-2 py-4 text-center"><input type="number" className="w-24 text-center border p-1" value={uData.サブ} onChange={e => handleUtilityInputChange(unit.ユニット名, 'サブ', Number(e.target.value))} /></td>
+              <td className="px-2 py-4 text-center font-bold text-lg">{uData.合計.toLocaleString()}</td></tr>); })}</tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const handlePrint = (summary: UserSummary) => { setPrintMode('individual'); setPrintingUsers([summary]); setTimeout(() => window.print(), 100); };
   const handlePrintAll = (summaries: UserSummary[]) => { setPrintMode('individual'); setPrintingUsers(summaries); setTimeout(() => window.print(), 100); };
   const handlePrintSummaryList = (summaries: UserSummary[]) => { setPrintMode('summary_list'); setPrintingUsers(summaries); setTimeout(() => window.print(), 100); };
@@ -471,6 +526,7 @@ export default function RefundCalculator() {
   const renderTable = () => {
     if (activeTab === 'mealInput') return renderMealInput();
     if (activeTab === 'unitInput') return renderUnitInput();
+    if (activeTab === 'utilityInput') return renderUtilityInput();
     const tabs = [
       { id: 'unitManagement', label: 'ユニット管理', data: unitManagement }, { id: 'unitMaster', label: 'ユニットマスタ', data: unitMaster },
       { id: 'unitUtilityCost', label: 'ユニット別光熱費', data: unitUtilityCost }, { id: 'mealCount', label: '食数計算(参照)', data: mealCount },
@@ -533,9 +589,9 @@ export default function RefundCalculator() {
         {error && <div className="mb-8 bg-rose-50 border-2 border-rose-100 rounded-3xl p-6 flex items-center gap-4 text-rose-900 font-bold"><AlertTriangle />{error}</div>}
         {successMessage && <div className="mb-8 bg-emerald-50 border-2 border-emerald-100 rounded-3xl p-6 text-emerald-900 font-black">✓ {successMessage}</div>}
         <div className="bg-white/60 backdrop-blur rounded-[40px] shadow-2xl border overflow-hidden mb-12">
-          <div className="px-8 border-b flex gap-2 overflow-x-auto no-scrollbar">{['unitManagement', 'mealInput', 'unitInput', 'unitMaster', 'unitUtilityCost', 'mealCount', 'refundDetail', 'userSummary'].map(id => (
+          <div className="px-8 border-b flex gap-2 overflow-x-auto no-scrollbar">{['unitManagement', 'mealInput', 'unitInput', 'utilityInput', 'unitMaster', 'unitUtilityCost', 'mealCount', 'refundDetail', 'userSummary'].map(id => (
             <button key={id} onClick={() => setActiveTab(id)} className={`py-6 px-6 font-black text-sm transition-all relative ${activeTab === id ? 'text-blue-600' : 'text-slate-400'}`}>
-              {{ unitManagement: 'ユニット管理', mealInput: '食数入力', unitInput: 'ユニット入力', unitMaster: 'ユニットマスタ', unitUtilityCost: '光熱費', mealCount: '食数参照', refundDetail: '明細', userSummary: 'サマリー' }[id]}
+              {{ unitManagement: 'ユニット管理', mealInput: '食数入力', unitInput: 'ユニット入力', utilityInput: '光熱費入力', unitMaster: 'ユニットマスタ', unitUtilityCost: '光熱費参照', mealCount: '食数参照', refundDetail: '明細', userSummary: 'サマリー' }[id]}
               {activeTab === id && <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-blue-500 rounded-t-full"></div>}
             </button>
           ))}</div>
